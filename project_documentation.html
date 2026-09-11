@@ -1,0 +1,3081 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>College Feedback System — Complete Technical Architecture & System Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.78);
+      --bg-card-hover: rgba(31, 41, 55, 0.9);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(99, 102, 241, 0.45);
+      --accent-indigo: #6366f1;
+      --accent-indigo-light: #818cf8;
+      --accent-purple: #a855f7;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --code-bg: #030712;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+      --sidebar-width: 290px;
+      --mobile-header-height: 64px;
+      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f1f5f9;
+      --bg-card: rgba(255, 255, 255, 0.95);
+      --bg-card-hover: rgba(248, 250, 252, 1);
+      --border-color: rgba(15, 23, 42, 0.09);
+      --border-focus: rgba(79, 70, 229, 0.3);
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --code-bg: #1e293b;
+      --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 10px 10px -5px rgba(15, 23, 42, 0.04);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-indigo);
+    }
+
+    /* Mobile Sticky Top Header */
+    .mobile-header {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--mobile-header-height);
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 60;
+      padding: 0 16px;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(12px);
+    }
+
+    .mobile-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .mobile-brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      flex-shrink: 0;
+    }
+
+    .mobile-brand-text h1 {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .mobile-brand-text p {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .mobile-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .icon-btn:hover {
+      border-color: var(--accent-indigo);
+      color: var(--accent-indigo-light);
+    }
+
+    /* Sidebar Drawer Backdrop */
+    .sidebar-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 70;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .sidebar-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Layout */
+    .app-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 80;
+      backdrop-filter: blur(12px);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sidebar-header {
+      padding: 22px 20px 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .brand-text h1 {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.2px;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-close-btn {
+      display: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .sidebar-close-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent-rose);
+    }
+
+    .sidebar-search-box {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input-wrapper svg.search-icon {
+      position: absolute;
+      left: 12px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 34px 9px 36px;
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 0 3px var(--border-focus);
+    }
+
+    .search-clear-btn {
+      display: none;
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .search-clear-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .sidebar-menu {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .menu-heading {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      font-weight: 700;
+      padding: 10px 10px 6px 10px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: var(--transition);
+      user-select: none;
+    }
+
+    .nav-link svg {
+      flex-shrink: 0;
+      color: var(--text-muted);
+      transition: var(--transition);
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+      background-color: var(--bg-tertiary);
+    }
+
+    .nav-link:hover svg {
+      color: var(--accent-indigo-light);
+    }
+
+    .nav-link.active {
+      color: #ffffff;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0.08));
+      border-left: 3px solid var(--accent-indigo);
+      font-weight: 600;
+    }
+
+    .nav-link.active svg {
+      color: var(--accent-indigo-light);
+    }
+
+    .sidebar-footer {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .theme-toggle-btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .theme-toggle-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent-indigo);
+    }
+
+    /* Main Content */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      padding: 40px 56px 80px 56px;
+      max-width: 1440px;
+      width: calc(100% - var(--sidebar-width));
+      transition: margin-left 0.3s ease, width 0.3s ease;
+    }
+
+    /* Header Hero */
+    .hero-banner {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.14) 0%, rgba(168, 85, 247, 0.08) 50%, rgba(6, 182, 212, 0.05) 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 36px 40px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-xl);
+      scroll-margin-top: 80px;
+    }
+
+    .hero-badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      letter-spacing: 0.2px;
+    }
+
+    .badge-indigo {
+      background: rgba(99, 102, 241, 0.16);
+      color: var(--accent-indigo-light);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .badge-emerald {
+      background: rgba(16, 185, 129, 0.16);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-cyan {
+      background: rgba(6, 182, 212, 0.16);
+      color: #22d3ee;
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-purple {
+      background: rgba(168, 85, 247, 0.16);
+      color: #c084fc;
+      border-color: rgba(168, 85, 247, 0.3);
+    }
+
+    .hero-title {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      line-height: 1.25;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 30%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    [data-theme="light"] .hero-title {
+      background: linear-gradient(135deg, #0f172a 30%, #334155 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 880px;
+      line-height: 1.6;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(8px);
+      transition: var(--transition);
+    }
+
+    .stat-card:hover {
+      border-color: var(--accent-indigo);
+      transform: translateY(-2px);
+    }
+
+    .stat-icon-wrapper {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text-primary);
+    }
+
+    .stat-lbl {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Section Structure */
+    .doc-section {
+      margin-bottom: 56px;
+      scroll-margin-top: 80px;
+      transition: opacity 0.3s ease;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .section-title-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-num-badge {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-indigo-light);
+    }
+
+    .section-title {
+      font-size: 23px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      color: var(--text-primary);
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+
+    /* Cards & Grids */
+    .card-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .card-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      backdrop-filter: blur(12px);
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .panel-card:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow: var(--shadow-md);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .panel-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .panel-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Tables */
+    .table-container {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      overflow-x: auto;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+      min-width: 600px;
+    }
+
+    thead {
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      padding: 13px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    /* Method Badges */
+    .method-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.3px;
+    }
+
+    .method-get {
+      background: rgba(6, 182, 212, 0.15);
+      color: #22d3ee;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .method-post {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .method-put {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .method-delete {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* Code & Pre */
+    code,
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    code {
+      font-size: 12.5px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--code-bg);
+      color: var(--accent-indigo-light);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 18px;
+      overflow-x: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #e2e8f0;
+      margin: 14px 0;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Code Block Header */
+    .code-block-wrapper {
+      position: relative;
+      margin: 16px 0;
+    }
+
+    .code-block-header {
+      background: #111827;
+      border: 1px solid var(--border-color);
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .code-block-wrapper pre {
+      margin: 0;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-family: inherit;
+      padding: 3px 6px;
+      border-radius: 4px;
+      transition: var(--transition);
+    }
+
+    .copy-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    /* Callout Alert Boxes */
+    .callout {
+      border-radius: 14px;
+      padding: 18px 22px;
+      margin: 20px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      border: 1px solid transparent;
+    }
+
+    .callout-icon {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .callout-content h4 {
+      font-size: 14.5px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .callout-content p {
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    .callout-info {
+      background: rgba(99, 102, 241, 0.08);
+      border-color: rgba(99, 102, 241, 0.25);
+      color: #e0e7ff;
+    }
+
+    .callout-info .callout-icon {
+      color: var(--accent-indigo-light);
+    }
+
+    .callout-info h4 {
+      color: #ffffff;
+    }
+
+    .callout-success {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.25);
+      color: #d1fae5;
+    }
+
+    .callout-success .callout-icon {
+      color: #34d399;
+    }
+
+    .callout-success h4 {
+      color: #ffffff;
+    }
+
+    .callout-warning {
+      background: rgba(245, 158, 11, 0.08);
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #fef3c7;
+    }
+
+    .callout-warning .callout-icon {
+      color: #fbbf24;
+    }
+
+    .callout-warning h4 {
+      color: #ffffff;
+    }
+
+    .callout-danger {
+      background: rgba(244, 63, 94, 0.08);
+      border-color: rgba(244, 63, 94, 0.25);
+      color: #ffe4e6;
+    }
+
+    .callout-danger .callout-icon {
+      color: #fb7185;
+    }
+
+    .callout-danger h4 {
+      color: #ffffff;
+    }
+
+    /* Flow Sequence Steps */
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .flow-step-item {
+      display: flex;
+      gap: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 20px;
+      transition: var(--transition);
+    }
+
+    .flow-step-item:hover {
+      border-color: var(--accent-indigo);
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent-indigo);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-body h4 {
+      font-size: 14.5px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+    }
+
+    .step-body p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* List styling */
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .feature-list li svg {
+      flex-shrink: 0;
+      margin-top: 3px;
+      color: var(--accent-emerald);
+    }
+
+    /* Floating Back To Top Button */
+    .back-to-top {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--accent-indigo);
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: var(--transition);
+      z-index: 50;
+    }
+
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .back-to-top:hover {
+      background: var(--accent-indigo-light);
+      transform: translateY(-3px);
+    }
+
+    /* Footer */
+    .doc-footer {
+      margin-top: 80px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* RESPONSIVE BREAKPOINTS */
+    @media (max-width: 1024px) {
+      .mobile-header {
+        display: flex;
+      }
+
+      .sidebar-close-btn {
+        display: flex;
+      }
+
+      .sidebar {
+        transform: translateX(-100%);
+        box-shadow: var(--shadow-xl);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: calc(var(--mobile-header-height) + 24px) 24px 60px 24px;
+      }
+
+      .card-grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .card-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero-banner {
+        padding: 24px 20px;
+        border-radius: 16px;
+      }
+
+      .hero-title {
+        font-size: 25px;
+      }
+
+      .hero-subtitle {
+        font-size: 14.5px;
+      }
+
+      .main-content {
+        padding: calc(var(--mobile-header-height) + 16px) 16px 48px 16px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .card-grid-3,
+      .card-grid-4 {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-card {
+        padding: 18px 16px;
+      }
+
+      .section-title {
+        font-size: 20px;
+      }
+
+      .flow-step-item {
+        padding: 14px;
+        gap: 12px;
+      }
+
+      .doc-footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Mobile Sticky Top Header -->
+  <header class="mobile-header">
+    <a href="#overview" class="mobile-brand" onclick="handleNavClick(event, 'overview')">
+      <div class="mobile-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+          <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+        </svg>
+      </div>
+      <div class="mobile-brand-text">
+        <h1>CFS Architecture</h1>
+        <p>MIT Mysore System</p>
+      </div>
+    </a>
+
+    <div class="mobile-actions">
+      <button class="icon-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+      <button class="icon-btn" id="mobileMenuBtn" onclick="toggleMobileSidebar()" title="Open Navigation Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mobile Sidebar Backdrop Overlay -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#overview" class="brand-title" onclick="handleNavClick(event, 'overview')">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+              <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>CFS Architecture</h1>
+            <p>MIT Mysore System</p>
+          </div>
+        </a>
+        <button class="sidebar-close-btn" onclick="closeMobileSidebar()" title="Close Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-search-box">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="docSearch" class="search-input" placeholder="Search architecture, APIs..."
+            oninput="filterDocs()">
+          <button id="searchClearBtn" class="search-clear-btn" onclick="clearSearch()" title="Clear Search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <nav class="sidebar-menu" id="sidebarMenu">
+        <div class="menu-heading">Navigation Sections</div>
+
+        <a href="#overview" class="nav-link active" onclick="handleNavClick(event, 'overview')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span>Overview &amp; Purpose</span>
+        </a>
+
+        <a href="#tech-stack" class="nav-link" onclick="handleNavClick(event, 'tech-stack')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+          <span>Technology Stack</span>
+        </a>
+
+        <a href="#portals" class="nav-link" onclick="handleNavClick(event, 'portals')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>4 User Portals</span>
+        </a>
+
+        <a href="#directory-structure" class="nav-link" onclick="handleNavClick(event, 'directory-structure')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>File System Hierarchy</span>
+        </a>
+
+        <a href="#database-schema" class="nav-link" onclick="handleNavClick(event, 'database-schema')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+          <span>Database Schema (15 Tables)</span>
+        </a>
+
+        <a href="#system-flows" class="nav-link" onclick="handleNavClick(event, 'system-flows')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Workflows &amp; Sequences</span>
+        </a>
+
+        <a href="#ai-copilot" class="nav-link" onclick="handleNavClick(event, 'ai-copilot')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+            <path d="M12 12L2.1 10.05"></path>
+            <path d="M12 12l4.95-9.05"></path>
+          </svg>
+          <span>SAGAR AI Copilot System</span>
+        </a>
+
+        <a href="#api-catalog" class="nav-link" onclick="handleNavClick(event, 'api-catalog')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          <span>Complete API Catalog</span>
+        </a>
+
+        <a href="#security" class="nav-link" onclick="handleNavClick(event, 'security')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Security &amp; Cryptography</span>
+        </a>
+
+        <a href="#services-ports" class="nav-link" onclick="handleNavClick(event, 'services-ports')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          <span>Services &amp; Environment</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span></span>
+        <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Hero Header (Section 0) -->
+      <header class="hero-banner doc-section" id="overview">
+        <div class="hero-badge-row">
+          <span class="badge badge-indigo">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            </svg>
+            MIT Mysore
+          </span>
+          <span class="badge badge-emerald">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Enterprise Monorepo
+          </span>
+          <span class="badge badge-cyan">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+            </svg>
+            Anonymous Cryptography
+          </span>
+          <span class="badge badge-purple">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+              </path>
+            </svg>
+            Autonomous SAGAR Copilot
+          </span>
+        </div>
+
+        <h1 class="hero-title">College Feedback &amp; Institutional Intelligence System</h1>
+        <p class="hero-subtitle">
+          A multi-tier institutional web application engineered for Maharaja Institute of Technology Mysore to collect,
+          evaluate, process, and act upon academic feedback. Built with mathematical anonymity guarantees, multi-tenant
+          departmental isolation, and LLM-powered autonomous assistance.
+        </p>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrapper"
+              style="background: rgba(99, 102, 241, 0.12); color: var(--accent-indigo-light);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-val">4 Roles</div>
+              <div class="stat-lbl">Admin, Dept, Faculty, Student</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper" style="background: rgba(16, 185, 129, 0.12); color: #34d399;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-val">15 Tables</div>
+              <div class="stat-lbl">Relational MySQL Schema</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper" style="background: rgba(6, 182, 212, 0.12); color: #22d3ee;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-val">Zero USN</div>
+              <div class="stat-lbl">Anonymity by Architecture</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper" style="background: rgba(168, 85, 247, 0.12); color: #c084fc;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-val">SAGAR AI</div>
+              <div class="stat-lbl">Groq gpt-oss-120b Swarm</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- SECTION 1: TECHNOLOGY STACK -->
+      <section class="doc-section" id="tech-stack">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">01</div>
+            <h2 class="section-title">Complete Technology Stack &amp; Libraries</h2>
+          </div>
+        </div>
+        <p class="section-desc">The platform is organized as a unified monorepo divided into a client-side Single Page
+          Application (SPA) and an event-driven RESTful &amp; WebSocket backend.</p>
+
+        <div class="card-grid-2">
+          <!-- Frontend Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(99, 102, 241, 0.15); color: var(--accent-indigo-light);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                  </path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Frontend Client Layer</h3>
+                <p class="panel-subtitle">Directory: /feedback-system (Port 5173)</p>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Technology</th>
+                    <th>Version</th>
+                    <th>Architectural Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>React</strong></td>
+                    <td><code>^19.2.0</code></td>
+                    <td>Core declarative reactive component view layer</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Vite</strong></td>
+                    <td><code>^7.2.2</code></td>
+                    <td>Hot Module Replacement build tool &amp; bundler</td>
+                  </tr>
+                  <tr>
+                    <td><strong>React Router DOM</strong></td>
+                    <td><code>^7.9.6</code></td>
+                    <td>Declarative client-side routing with nested layouts</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Zustand</strong></td>
+                    <td><code>^5.0.15</code></td>
+                    <td>Atomic state stores (useCopilotStore, useUIStore, useDepartmentStore)</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Recharts</strong></td>
+                    <td><code>^3.10.1</code></td>
+                    <td>SVG-driven Area, Bar, Pie, and Radar charts</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Framer Motion</strong></td>
+                    <td><code>^12.40.0</code></td>
+                    <td>GPU-accelerated layout and view transitions</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Socket.IO Client</strong></td>
+                    <td><code>^4.8.3</code></td>
+                    <td>Bidirectional WebSocket channel for AI streaming</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Axios</strong></td>
+                    <td><code>^1.13.2</code></td>
+                    <td>HTTP transport with interceptors and cookies</td>
+                  </tr>
+                  <tr>
+                    <td><strong>XLSX (SheetJS)</strong></td>
+                    <td><code>^0.18.5</code></td>
+                    <td>Client-side Excel parsing and report generation</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Web Speech API</strong></td>
+                    <td><code>Native</code></td>
+                    <td>Browser speech-to-text audio synthesis for Copilot</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Backend Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                  <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                  <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Backend Server Layer</h3>
+                <p class="panel-subtitle">Directory: /backend (Port 8081)</p>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Technology</th>
+                    <th>Version</th>
+                    <th>Architectural Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Node.js / Express</strong></td>
+                    <td><code>^5.1.0</code></td>
+                    <td>High-throughput asynchronous REST server</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Knex.js</strong></td>
+                    <td><code>^3.3.0</code></td>
+                    <td>SQL query builder with transaction &amp; pool controls</td>
+                  </tr>
+                  <tr>
+                    <td><strong>MySQL2</strong></td>
+                    <td><code>^3.15.3</code></td>
+                    <td>Promise-based client with connection pool (2-150)</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Socket.IO</strong></td>
+                    <td><code>^4.8.3</code></td>
+                    <td>Real-time streaming and tab heartbeat tracker</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Groq SDK</strong></td>
+                    <td><code>^1.5.0</code></td>
+                    <td>Low-latency inference for model openai/gpt-oss-120b</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Cloudinary SDK</strong></td>
+                    <td><code>^2.10.1</code></td>
+                    <td>Media CDN &amp; generative AI background replacement</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Nodemailer</strong></td>
+                    <td><code>^9.1.0</code></td>
+                    <td>SMTP mailer with CID inline logos and credentials</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Express-Session</strong></td>
+                    <td><code>^1.18.2</code></td>
+                    <td>Cookie-based sessions persisted in MySQL</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Bcrypt</strong></td>
+                    <td><code>^6.0.0</code></td>
+                    <td>Salted one-way cryptographic password hashing</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Node.js Crypto</strong></td>
+                    <td><code>Built-in</code></td>
+                    <td>AES-256-CBC two-way encryption for private notes</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Zod</strong></td>
+                    <td><code>^4.4.3</code></td>
+                    <td>Runtime validation of required environment variables</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: 4 USER PORTALS -->
+      <section class="doc-section" id="portals">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">02</div>
+            <h2 class="section-title">The 4 Functional User Portals</h2>
+          </div>
+        </div>
+        <p class="section-desc">The application segments workflows into 4 role-gated user portals, each with customized
+          views, capabilities, and data access barriers.</p>
+
+        <div class="card-grid-4">
+          <!-- Admin Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(244, 63, 94, 0.15); color: #fb7185;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Super Admin</h3>
+                <span class="badge badge-purple">Full Governance</span>
+              </div>
+            </div>
+            <ul class="feature-list">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Institution-wide KPI metrics (ratings, total counts)</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Department lifecycle: create, toggle active, reset passwords</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Selective data purge (students, faculty, sessions, or all)</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Full audit log inspection across all departments</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Department Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(99, 102, 241, 0.15); color: var(--accent-indigo-light);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Department HOD</h3>
+                <span class="badge badge-indigo">Operations Head</span>
+              </div>
+            </div>
+            <ul class="feature-list">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Session creator: Sem &amp; Sec verification gates</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Live tracking: see missing/pending/done student roster</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Automated batch email dispatch with credentials</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>SAGAR Autonomous Copilot with voice navigation</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>AES-256 encrypted internal communications with faculty</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Faculty Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Faculty Member</h3>
+                <span class="badge badge-emerald">Analytics &amp; Profile</span>
+              </div>
+            </div>
+            <ul class="feature-list">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Scorecards: Overall score, response volume, 4-tier distribution</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Radar analysis: question-by-question comparative scores</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>One-click downloadable multi-sheet Excel (.xlsx) reports</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Generative AI corporate headshot photo enhancement</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Student Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Student</h3>
+                <span class="badge badge-cyan">Anonymous Evaluator</span>
+              </div>
+            </div>
+            <ul class="feature-list">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Passwordless login using USN + active Session ID</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Step-by-step evaluation wizard for each assigned course</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Dynamic question categories with 1-5 rating scale</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Zero USN association: feedback cannot be traced to identity</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Single-submission enforcement via idempotency token</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: FILE SYSTEM HIERARCHY -->
+      <section class="doc-section" id="directory-structure">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">03</div>
+            <h2 class="section-title">Comprehensive File System Breakdown</h2>
+          </div>
+        </div>
+        <p class="section-desc">Every directory, controller, route, and UI component within the codebase and its exact
+          architectural purpose.</p>
+
+        <div class="card-grid-2">
+          <!-- Backend Tree -->
+          <div class="panel-card">
+            <h3 class="panel-title" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              Backend Architecture Details
+            </h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>File / Path</th>
+                    <th>Core Responsibility</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>server.js</code></td>
+                    <td>Express 5 initialization, Helmet security, rate limiter, Socket.IO copilot attachment,
+                      MySQLStore session config, error handlers.</td>
+                  </tr>
+                  <tr>
+                    <td><code>config/db.js</code></td>
+                    <td>Knex connection initialization pointing to MySQL (pool: min 2, max 150).</td>
+                  </tr>
+                  <tr>
+                    <td><code>config/env.js</code></td>
+                    <td>Zod schema validation for SESSION_SECRET, GROQ_API_KEY, PORT. Halts server on missing keys.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/adminController.js</code></td>
+                    <td>Global institutional KPI aggregation, department summaries, status toggling, and multi-entity
+                      purge transactions.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/analyticsController.js</code></td>
+                    <td>Department 7-day trend metrics, faculty radar breakdown, 4-tier distribution, roster
+                      participation stats.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/authController.js</code></td>
+                    <td>Bcrypt comparison for Admin/Dept/Faculty/Student logins, session creation, silent tab logouts,
+                      directory lookup.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/copilotController.js</code></td>
+                    <td>30KB autonomous SAGAR Copilot. Function calling tools, intent router agent, streaming responses,
+                      UI actions.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/courseController.js</code></td>
+                    <td>Course catalog management, soft deactivation, bulk Excel course imports.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/facultyController.js</code></td>
+                    <td>Faculty onboarding, registration approval queue, Cloudinary AI portrait transformations,
+                      zero-latency image pre-warming.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/feedbackController.js</code></td>
+                    <td>Anonymous rating persistence, idempotency token generator, pessimistic student locking, question
+                      catalog.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/remarksController.js</code></td>
+                    <td>Qualitative feedback ingestion, Groq LLM sentiment extraction (Executive Summary, Strengths,
+                      Areas for Improvement).</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/sessionController.js</code></td>
+                    <td>Session creation verification gates, auto student enrollment, tracking, student email dispatch
+                      via Nodemailer.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/studentController.js</code></td>
+                    <td>Student directory management, bulk Excel UPSERT import with conflict resolution on USN.</td>
+                  </tr>
+                  <tr>
+                    <td><code>controllers/systemController.js</code></td>
+                    <td>AES-256-CBC encrypted communication notes between HOD and Faculty, global search indexing.</td>
+                  </tr>
+                  <tr>
+                    <td><code>middleware/authMiddleware.js</code></td>
+                    <td>Role-based guards (isAdmin, isDepartment, isFaculty) and horizontal security validation
+                      preventing cross-tenant access.</td>
+                  </tr>
+                  <tr>
+                    <td><code>middleware/errorMiddleware.js</code></td>
+                    <td>Centralized 404 Route Not Found and 500 unhandled error interceptors with masked production
+                      stack traces.</td>
+                  </tr>
+                  <tr>
+                    <td><code>utils/emailService.js</code></td>
+                    <td>Gmail SMTP transporter, responsive inline HTML template with CID embedded college logo and
+                      direct student credentials.</td>
+                  </tr>
+                  <tr>
+                    <td><code>utils/logger.js</code></td>
+                    <td>Audit log recorder; parses user agents with ua-parser-js to capture operating system, browser,
+                      and IP.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Frontend Tree -->
+          <div class="panel-card">
+            <h3 class="panel-title" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              </svg>
+              Frontend Structure &amp; Pages
+            </h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Component / Page</th>
+                    <th>Rendered View &amp; Capabilities</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>App.jsx</code></td>
+                    <td>React Router DOM v7 route definitions, Toaster styling, ProtectedRoute role guards.</td>
+                  </tr>
+                  <tr>
+                    <td><code>theme.css</code></td>
+                    <td>Custom design system tokens: 8-pt spacing, typography hierarchy, primary &amp; secondary
+                      semantic variables.</td>
+                  </tr>
+                  <tr>
+                    <td><code>context/AuthContext.jsx</code></td>
+                    <td>Persistent session provider calling <code>/auth/check-session</code> on initial load.</td>
+                  </tr>
+                  <tr>
+                    <td><code>store/useCopilotStore.js</code></td>
+                    <td>Zustand store tracking AI conversation history, typing state, streaming deltas, and UI action
+                      triggers.</td>
+                  </tr>
+                  <tr>
+                    <td><code>components/copilot/CopilotWidget.jsx</code></td>
+                    <td>Floating interactive AI agent with Web Speech voice recognition, live Markdown rendering, and
+                      tool cards.</td>
+                  </tr>
+                  <tr>
+                    <td><code>components/copilot/GenerativeChart.jsx</code></td>
+                    <td>Client-side dynamic chart synthesizer rendered in chat when requested by the AI Copilot.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/HomePortal.jsx</code></td>
+                    <td>Split-screen branded landing portal with login selection cards for all 4 roles and faculty
+                      self-registration.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/FeedbackForm.jsx</code></td>
+                    <td>Multi-step student feedback wizard with categorized dynamic questions, idempotency tokens, and
+                      anonymous submission.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/DepartmentDashboard.jsx</code></td>
+                    <td>HOD overview: KPI cards, real-time feedback volume area charts, active sessions, quick action
+                      modals.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/ManageSessions.jsx</code></td>
+                    <td>Active feedback session grid, student participation tracker (missing/done), session completion,
+                      email notification.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/FacultyDashboard.jsx</code></td>
+                    <td>Faculty performance analytics: 4-tier rating distribution pie charts, radar breakdown,
+                      multi-sheet Excel export.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/FacultyProfile.jsx</code></td>
+                    <td>Faculty profile editor with Cloudinary AI corporate portrait restoration and background
+                      replacement.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/DepartmentRemarks.jsx</code></td>
+                    <td>Anonymous student textual remarks viewer with Groq AI analysis button for executive synthesis.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/AuditLogs.jsx</code></td>
+                    <td>Security log viewer detailing user actions, IP addresses, and device/browser telemetry.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/admin/AdminMainDashboard.jsx</code></td>
+                    <td>Super Admin control center with institutional metrics, departmental summaries, and top faculty
+                      rankings.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pages/admin/AdminDepartments.jsx</code></td>
+                    <td>Department creation, status toggling, and selective data purging modal.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: DATABASE SCHEMA -->
+      <section class="doc-section" id="database-schema">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">04</div>
+            <h2 class="section-title">Relational Database Schema (15 Tables)</h2>
+          </div>
+        </div>
+        <p class="section-desc">The relational database is constructed in MySQL InnoDB with explicit foreign key
+          cascading, composite keys for multi-tenancy, and dedicated indices for analytics speed.</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Table Name</th>
+                <th>Primary Key</th>
+                <th>Foreign Keys &amp; Constraints</th>
+                <th>Notable Columns &amp; Data Types</th>
+                <th>Architectural Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>admin</code></td>
+                <td><code>admin_id</code></td>
+                <td>Unique: <code>username</code></td>
+                <td><code>username</code> (varchar 50), <code>password</code> (varchar 255 bcrypt)</td>
+                <td>Stores Super Administrator credentials</td>
+              </tr>
+              <tr>
+                <td><code>department</code></td>
+                <td><code>dept_id</code></td>
+                <td>Unique: <code>username</code></td>
+                <td><code>dept_name</code>, <code>username</code>, <code>password</code> (bcrypt),
+                  <code>is_active</code> (tinyint)
+                </td>
+                <td>Academic department accounts and suspension flags</td>
+              </tr>
+              <tr>
+                <td><code>global_directory</code></td>
+                <td><code>user_id</code></td>
+                <td>Indexed: <code>dept_id</code></td>
+                <td><code>role</code> (enum 'student', 'faculty'), <code>dept_id</code></td>
+                <td>Fast global router to map user identity to tenant department</td>
+              </tr>
+              <tr>
+                <td><code>global_students</code></td>
+                <td><code>(usn, dept_id)</code></td>
+                <td>Composite PK for multi-tenant isolation</td>
+                <td><code>name</code>, <code>sem</code>, <code>section</code>, <code>session_id</code>,
+                  <code>feedback_given</code> ('missing','pending','done'), <code>email</code>
+                </td>
+                <td>Enrolled students roster and live session tracking state</td>
+              </tr>
+              <tr>
+                <td><code>global_faculty</code></td>
+                <td><code>(faculty_id, dept_id)</code></td>
+                <td>Unique: <code>email</code>, <code>f_id</code></td>
+                <td><code>name</code>, <code>email</code>, <code>position</code>, <code>dob</code>,
+                  <code>joining_date</code>, <code>profile_picture_url</code>, <code>is_active</code>
+                </td>
+                <td>Faculty directory, credentials, and Cloudinary image URLs</td>
+              </tr>
+              <tr>
+                <td><code>global_course</code></td>
+                <td><code>(course_code, dept_id)</code></td>
+                <td>Unique: <code>course_id</code></td>
+                <td><code>course_name</code>, <code>sem</code> (tinyint), <code>is_active</code> (tinyint)</td>
+                <td>Department course and subject catalog</td>
+              </tr>
+              <tr>
+                <td><code>global_assign</code></td>
+                <td><code>(faculty_id, course_code, dept_id, sem, section)</code></td>
+                <td>FK to <code>global_faculty</code>, FK to <code>global_course</code> (ON DELETE CASCADE)</td>
+                <td><code>sem</code>, <code>section</code> (enum A-H)</td>
+                <td>Maps which faculty member teaches which course in which section</td>
+              </tr>
+              <tr>
+                <td><code>global_sessions</code></td>
+                <td><code>(session_id, dept_id)</code></td>
+                <td>Indexed: <code>status</code></td>
+                <td><code>sem</code>, <code>section</code>, <code>status</code> ('active','ended'),
+                  <code>ai_summary</code> (text), <code>created_at</code>
+                </td>
+                <td>Feedback collection sessions and Groq AI analysis summaries</td>
+              </tr>
+              <tr>
+                <td><code>global_feedback_questions</code></td>
+                <td><code>(question_id, dept_id)</code></td>
+                <td>Unique: <code>question_id</code></td>
+                <td><code>question_text</code>, <code>question_heading</code> (e.g. 'General Feedback')</td>
+                <td>Custom dynamic evaluation criteria per department</td>
+              </tr>
+              <tr>
+                <td><code>global_student_feedback</code></td>
+                <td><code>id</code></td>
+                <td>FK to <code>global_faculty</code>, <code>global_sessions</code>, <code>global_course</code>,
+                  <code>global_feedback_questions</code>
+                </td>
+                <td><code>rating</code> (tinyint 1-5), <code>faculty_id</code>, <code>course_id</code>,
+                  <code>question_id</code>, <code>session_id</code>, <code>dept_id</code>
+                </td>
+                <td><strong>Anonymous ratings repository. CRITICAL: NO USN COLUMN!</strong></td>
+              </tr>
+              <tr>
+                <td><code>global_session_remarks</code></td>
+                <td><code>remark_id</code></td>
+                <td>FK to <code>global_sessions</code> (ON DELETE CASCADE)</td>
+                <td><code>remark_text</code> (text), <code>sentiment_score</code>, <code>session_id</code>,
+                  <code>dept_id</code>
+                </td>
+                <td>Anonymous qualitative student remarks for departments</td>
+              </tr>
+              <tr>
+                <td><code>global_faculty_notes</code></td>
+                <td><code>note_id</code></td>
+                <td>FK to <code>global_faculty</code> (ON DELETE CASCADE)</td>
+                <td><code>sender_type</code> ('department','faculty'), <code>note_text</code> (AES-256 encrypted),
+                  <code>is_read</code>
+                </td>
+                <td>Encrypted two-way internal communications</td>
+              </tr>
+              <tr>
+                <td><code>global_pending_faculty_registrations</code></td>
+                <td><code>id</code></td>
+                <td>Indexed: <code>dept_id</code></td>
+                <td><code>faculty_id</code>, <code>name</code>, <code>email</code>, <code>dept_id</code>,
+                  <code>created_at</code>
+                </td>
+                <td>Queue of public faculty signups awaiting HOD approval</td>
+              </tr>
+              <tr>
+                <td><code>global_department_activity_logs</code></td>
+                <td><code>log_id</code></td>
+                <td>Indexed: <code>dept_id</code></td>
+                <td><code>action_type</code> (LOGIN, LOGOUT, CREATE, UPDATE, DELETE, UPLOAD), <code>entity</code>,
+                  <code>ip_address</code>, <code>device_info</code>
+                </td>
+                <td>Audit trail of administrative actions with browser/OS metadata</td>
+              </tr>
+              <tr>
+                <td><code>global_used_tokens</code></td>
+                <td><code>token</code></td>
+                <td>Unique Primary Key</td>
+                <td><code>created_at</code> (timestamp)</td>
+                <td>Idempotency registry to eliminate duplicate feedback submissions</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SECTION 5: WORKFLOWS & SEQUENCES -->
+      <section class="doc-section" id="system-flows">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">05</div>
+            <h2 class="section-title">Core System Workflows &amp; Sequences</h2>
+          </div>
+        </div>
+        <p class="section-desc">End-to-end execution paths illustrating how frontend components, backend services, and
+          database transactions collaborate.</p>
+
+        <!-- Flow 1: Feedback Submission -->
+        <div class="panel-card" style="margin-bottom: 24px;">
+          <h3 class="panel-title" style="margin-bottom: 8px;">1. Anonymous Feedback Submission &amp; Concurrency Guard
+          </h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">How student evaluations are
+            submitted atomically with zero trace of student identity.</p>
+
+          <div class="flow-steps">
+            <div class="flow-step-item">
+              <div class="step-number">1</div>
+              <div class="step-body">
+                <h4>Idempotency Token Acquisition</h4>
+                <p>When the student reaches the feedback page, the client requests <code>GET /feedback/token</code>. The
+                  server issues a cryptographically random UUID using <code>crypto.randomUUID()</code>.</p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">2</div>
+              <div class="step-body">
+                <h4>Token Registry Locking</h4>
+                <p>Upon submission to <code>POST /submit-feedback</code>, an atomic Knex database transaction begins
+                  (<code>db.transaction()</code>). The server attempts to insert the idempotency token into
+                  <code>global_used_tokens</code>. If a duplicate request occurs simultaneously, MySQL throws
+                  <code>ER_DUP_ENTRY</code> and aborts immediately.
+                </p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">3</div>
+              <div class="step-body">
+                <h4>Pessimistic Student Row Locking</h4>
+                <p>The student record in <code>global_students</code> is selected with a pessimistic lock:
+                  <code>.where({ usn, session_id }).forUpdate()</code>. If <code>feedback_given === 'done'</code>, the
+                  transaction rolls back.
+                </p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">4</div>
+              <div class="step-body">
+                <h4>De-Identified Feedback Persistence</h4>
+                <p>The feedback ratings are looped and inserted into <code>global_student_feedback</code> containing
+                  only <code>faculty_id</code>, <code>course_id</code>, <code>question_id</code>, <code>rating</code>,
+                  and <code>session_id</code>. <strong>The student's USN is omitted entirely.</strong></p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">5</div>
+              <div class="step-body">
+                <h4>Completion Flagging &amp; Transaction Commit</h4>
+                <p>The student's entry in <code>global_students</code> is updated to
+                  <code>feedback_given: 'done'</code>. The transaction commits. Data integrity is guaranteed even under
+                  concurrent network spikes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flow 2: Cloudinary AI Transformation -->
+        <div class="panel-card" style="margin-bottom: 24px;">
+          <h3 class="panel-title" style="margin-bottom: 8px;">2. Faculty Generative AI Profile Transformation</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">How faculty profile photos are
+            processed via Cloudinary generative AI and cached with zero latency.</p>
+
+          <div class="flow-steps">
+            <div class="flow-step-item">
+              <div class="step-number">1</div>
+              <div class="step-body">
+                <h4>In-Memory Upload</h4>
+                <p>The user selects a portrait photo. Multer intercepts the file in memory
+                  (<code>multer.memoryStorage()</code>) without writing unencrypted temporary files to the disk.</p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">2</div>
+              <div class="step-body">
+                <h4>Cloudinary Upload with Temporary Tag</h4>
+                <p>The buffer is streamed to Cloudinary in folder <code>faculty_profiles</code> tagged as
+                  <code>temp_upload</code>. An AI transformation URL is synthesized applying face restoration
+                  (<code>gen_restore</code>) and generative background replacement
+                  (<code>gen_background_replace:prompt_corporate_headshot...</code>).
+                </p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">3</div>
+              <div class="step-body">
+                <h4>Zero-Latency Pre-Warming</h4>
+                <p>Before the user clicks "Preview AI", the React client secretly executes:
+                  <code>new Image().src = res.data.aiUrl</code>. The browser downloads and caches the neural-rendered
+                  image in the background, making the UI transition instantaneous.
+                </p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">4</div>
+              <div class="step-body">
+                <h4>Permanent Persistence &amp; Orphan Cleanup</h4>
+                <p>When the user clicks "Save", the temporary tag is removed. The faculty record
+                  <code>global_faculty.profile_picture_url</code> is updated. The previous image public ID is queried
+                  and destroyed via <code>cloudinary.uploader.destroy()</code> to conserve cloud quota.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flow 3: Batch Email Notification -->
+        <div class="panel-card">
+          <h3 class="panel-title" style="margin-bottom: 8px;">3. Automated Student Notification Email Pipeline</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">How students receive secure login
+            credentials and session IDs via responsive HTML emails.</p>
+
+          <div class="flow-steps">
+            <div class="flow-step-item">
+              <div class="step-number">1</div>
+              <div class="step-body">
+                <h4>Target Query Extraction</h4>
+                <p>The HOD triggers <code>POST /session/notify/:session_id</code>. The server queries all students
+                  enrolled in the target semester and section with non-null email addresses.</p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">2</div>
+              <div class="step-body">
+                <h4>Dynamic HTML Rendering with Inline Assets</h4>
+                <p>Nodemailer compiles a modern HTML email with inline CID attachment (<code>cid:collegelogo</code>) to
+                  ensure the college emblem loads without third-party image blocking. The student's specific USN and
+                  Session ID are embedded into styled credential cards.</p>
+              </div>
+            </div>
+
+            <div class="flow-step-item">
+              <div class="step-number">3</div>
+              <div class="step-body">
+                <h4>Concurrent Settled Dispatch</h4>
+                <p>Emails are dispatched via <code>Promise.allSettled()</code> through the Gmail SMTP transporter.
+                  Failed individual transmissions are counted and reported back to the HOD without breaking the batch
+                  process.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 6: SAGAR AI COPILOT -->
+      <section class="doc-section" id="ai-copilot">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">06</div>
+            <h2 class="section-title">SAGAR: Autonomous Administrative AI Copilot</h2>
+          </div>
+        </div>
+        <p class="section-desc">SAGAR is an AI agent running directly in Node.js on top of the Groq SDK (model
+          <code>openai/gpt-oss-120b</code>). It operates via a real-time WebSocket connection to execute administrative
+          workflows autonomously.
+        </p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+          <div class="callout-content">
+            <h4>Swarm Router Architecture</h4>
+            <p>Before executing tool calls, an ultra-fast Router classification prompt evaluates user intent and
+              categorizes it into one of four states: <code>NAVIGATION</code>, <code>ANALYTICS</code>,
+              <code>ACTION</code>, or <code>GENERAL</code>. Only relevant function calling tools are passed to the
+              completion stream, optimizing token consumption and execution latency.
+            </p>
+          </div>
+        </div>
+
+        <div class="panel-card" style="margin-bottom: 24px;">
+          <h3 class="panel-title" style="margin-bottom: 14px;">Registered Copilot Tool Catalog (Function Calling Schema)
+          </h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Function Tool Name</th>
+                  <th>Arguments Schema</th>
+                  <th>Execution Behavior</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>navigate_to</code></td>
+                  <td><code>{ page: string }</code></td>
+                  <td>Dispatches client-side event to React Router to navigate across dashboard views (e.g.,
+                    /manage-sessions, /audit-logs).</td>
+                </tr>
+                <tr>
+                  <td><code>create_session_modal</code></td>
+                  <td><code>{ sem: integer, section: string }</code></td>
+                  <td>Opens the session creation dialog with pre-populated semester and section values.</td>
+                </tr>
+                <tr>
+                  <td><code>prepare_create_session</code></td>
+                  <td><code>{ sem: integer, section: string }</code></td>
+                  <td>Validates student and faculty enrollment in the database, then sends an interactive confirmation
+                    card to the user.</td>
+                </tr>
+                <tr>
+                  <td><code>prepare_approve_faculty</code></td>
+                  <td><code>{ faculty_id: string }</code></td>
+                  <td>Verifies pending registration and requests confirmation to activate the faculty member.</td>
+                </tr>
+                <tr>
+                  <td><code>prepare_add_course</code></td>
+                  <td><code>{ course_name, course_code, sem }</code></td>
+                  <td>Validates course code uniqueness and presents an approval card in chat.</td>
+                </tr>
+                <tr>
+                  <td><code>generate_chart</code></td>
+                  <td><code>{ title: string, data: Array }</code></td>
+                  <td>Sends structured data points to the chat client, rendering an interactive Recharts chart inside
+                    the widget.</td>
+                </tr>
+                <tr>
+                  <td><code>open_faculty_profile</code></td>
+                  <td><code>{ search_query: string }</code></td>
+                  <td>Fuzzy-matches faculty by name or ID in MySQL and navigates the browser to their analytics profile.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>analyze_faculty_feedback</code></td>
+                  <td><code>{ faculty_id: string }</code></td>
+                  <td>Queries average scores, total submissions, and recent session remarks to provide an instant
+                    summary in chat.</td>
+                </tr>
+                <tr>
+                  <td><code>show_pending_faculty_list</code></td>
+                  <td><code>{}</code></td>
+                  <td>Fetches unapproved faculty registrations from <code>global_pending_faculty_registrations</code>
+                    and renders interactive action cards.</td>
+                </tr>
+                <tr>
+                  <td><code>get_top_performing_faculty</code></td>
+                  <td><code>{ limit: integer }</code></td>
+                  <td>Computes average ratings across all department faculty and outputs a ranked leaderboard.</td>
+                </tr>
+                <tr>
+                  <td><code>generate_department_report</code></td>
+                  <td><code>{}</code></td>
+                  <td>Queries all faculty ratings in the department, compiles a CSV in memory, and triggers an automated
+                    browser download.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="code-block-wrapper">
+          <div class="code-block-header">
+            <span>backend/controllers/copilotController.js (Sliding Window &amp; Router)</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>// 1. Router Agent Intent Classification
+const routerResponse = await groq.chat.completions.create({
+  messages: [
+    { role: "system", content: "Classify user intent into ONE exact word: NAVIGATION, ANALYTICS, ACTION, or GENERAL." },
+    { role: "user", content: data.message }
+  ],
+  model: "openai/gpt-oss-120b",
+  max_tokens: 10,
+  temperature: 0.1
+});
+const intent = routerResponse.choices[0]?.message?.content?.trim().toUpperCase() || "GENERAL";
+
+// 2. Sliding Window Memory Guard (Prevents Token Context Overflow)
+let payloadMessages = messages;
+if (messages.length > 15) {
+  payloadMessages = [messages[0], messages[1], ...messages.slice(-13)];
+}
+
+// 3. Tool Filtering by Classified Intent
+let activeTools = [];
+if (intent.includes("NAV")) activeTools = copilotTools.filter(t => ['navigate_to', 'open_faculty_profile'].includes(t.function.name));
+else if (intent.includes("ANAL")) activeTools = copilotTools.filter(t => ['analyze_faculty_feedback', 'get_top_performing_faculty', 'generate_chart'].includes(t.function.name));
+else if (intent.includes("ACT")) activeTools = copilotTools.filter(t => ['prepare_create_session', 'prepare_approve_faculty', 'prepare_add_course'].includes(t.function.name));</code></pre>
+        </div>
+      </section>
+
+      <!-- SECTION 7: API CATALOG -->
+      <section class="doc-section" id="api-catalog">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">07</div>
+            <h2 class="section-title">Complete REST API Catalog</h2>
+          </div>
+        </div>
+        <p class="section-desc">Comprehensive inventory of all endpoints exposed by the Node.js Express server across
+          all route modules.</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Endpoint URL</th>
+                <th>Guards / Middleware</th>
+                <th>Description &amp; Operation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Auth -->
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/auth/admin-login</code></td>
+                <td><code>loginLimiter</code> (Rate Limit)</td>
+                <td>Authenticates Super Admin using bcrypt comparison; sets express-session.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/auth/department-login</code></td>
+                <td><code>loginLimiter</code></td>
+                <td>Authenticates Department HOD; checks account <code>is_active</code> status.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/auth/faculty-login</code></td>
+                <td><code>loginLimiter</code></td>
+                <td>Authenticates Faculty member via <code>global_directory</code> lookup.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/auth/student-login</code></td>
+                <td><code>loginLimiter</code></td>
+                <td>Validates USN and verifies active status of feedback session.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/auth/logout</code></td>
+                <td>None</td>
+                <td>Destroys active session, clears <code>connect.sid</code> cookie, logs activity.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/auth/check-session</code></td>
+                <td>None</td>
+                <td>Returns user session metadata or 401 if unauthenticated.</td>
+              </tr>
+
+              <!-- Faculty -->
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/faculty/add</code></td>
+                <td><code>isAdminOrDepartment</code></td>
+                <td>Creates faculty with default credentials; inserts into <code>global_directory</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/faculty/register</code></td>
+                <td>Public</td>
+                <td>Enqueues self-registration in <code>global_pending_faculty_registrations</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/faculty/pending/:dept_id</code></td>
+                <td><code>isAdminOrDepartment</code></td>
+                <td>Lists all pending registrations for the given department.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/faculty/approve</code></td>
+                <td><code>isAdminOrDepartment</code></td>
+                <td>Approves registration, generates hash, and moves record to active directory.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/faculty/profile/upload-temp</code></td>
+                <td><code>isFaculty</code>, <code>multer</code></td>
+                <td>Streams image buffer to Cloudinary, applies AI background restoration.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/faculty/profile/save</code></td>
+                <td><code>isFaculty</code></td>
+                <td>Persists final photo URL in MySQL and deletes obsolete Cloudinary assets.</td>
+              </tr>
+
+              <!-- Sessions -->
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/create-session</code></td>
+                <td><code>isDepartment</code></td>
+                <td>Validates registered students and assigned faculty, creates session, auto-binds students.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/sessions</code></td>
+                <td><code>isDepartment</code></td>
+                <td>Retrieves list of active and historic feedback sessions.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-put">PUT</span></td>
+                <td><code>/end-session/:id</code></td>
+                <td><code>isDepartment</code></td>
+                <td>Updates session status from active to ended.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-delete">DELETE</span></td>
+                <td><code>/delete-session/:id</code></td>
+                <td><code>isDepartment</code></td>
+                <td>Cascades deletion of session, ratings, remarks, and clears student tracking.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/track-session/:session_id</code></td>
+                <td><code>isDepartment</code></td>
+                <td>Returns student list and feedback submission status (missing, pending, done).</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/session/notify/:session_id</code></td>
+                <td><code>isDepartment</code></td>
+                <td>Dispatches customized HTML emails to all enrolled students with login credentials.</td>
+              </tr>
+
+              <!-- Feedback -->
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/feedback/token</code></td>
+                <td>None</td>
+                <td>Generates cryptographically random UUID token for idempotency.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/student/subjects/:session_id</code></td>
+                <td>None</td>
+                <td>Lists faculty and assigned subjects to be evaluated by student.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/submit-feedback</code></td>
+                <td>Student Session</td>
+                <td>Atomic submission of feedback ratings and optional department remark.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/questions/:dept_id</code></td>
+                <td><code>isAdminOrDepartment</code></td>
+                <td>Fetches dynamic questionnaire criteria grouped by category heading.</td>
+              </tr>
+
+              <!-- Remarks & AI -->
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/remarks/:dept_id</code></td>
+                <td><code>isAdminOrDepartment</code></td>
+                <td>Fetches anonymous student text remarks and cached AI summary.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/remarks/analyze</code></td>
+                <td><code>isAdminOrDepartment</code></td>
+                <td>Calls Groq LLM (openai/gpt-oss-120b) to synthesize sentiment and recommendations.</td>
+              </tr>
+
+              <!-- Admin -->
+              <tr>
+                <td><span class="method-badge method-get">GET</span></td>
+                <td><code>/admin/global-metrics</code></td>
+                <td><code>isAdmin</code></td>
+                <td>Calculates institutional student, faculty, session, and rating totals.</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-put">PUT</span></td>
+                <td><code>/admin/department/:dept_id/status</code></td>
+                <td><code>isAdmin</code></td>
+                <td>Toggles department suspension status (is_active).</td>
+              </tr>
+              <tr>
+                <td><span class="method-badge method-post">POST</span></td>
+                <td><code>/admin/department/:dept_id/purge</code></td>
+                <td><code>isAdmin</code></td>
+                <td>Selectively purges student, faculty, session, or entire department records.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SECTION 8: SECURITY & CRYPTOGRAPHY -->
+      <section class="doc-section" id="security">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">08</div>
+            <h2 class="section-title">Security, Privacy &amp; Cryptography</h2>
+          </div>
+        </div>
+        <p class="section-desc">Multi-layered security protocols engineered into every tier of data ingestion,
+          transmission, and persistent storage.</p>
+
+        <div class="card-grid-2">
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">AES-256-CBC Encrypted Notes</h3>
+                <p class="panel-subtitle">systemController.js Communication Security</p>
+              </div>
+            </div>
+            <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 14px;">
+              Internal performance remarks and notes exchanged between HODs and faculty are encrypted using AES-256-CBC
+              before writing to the database. The encryption key is derived using <code>crypto.scryptSync()</code> with
+              a 16-byte initialization vector. Plaintext never touches persistent storage.
+            </p>
+            <div class="code-block-wrapper">
+              <div class="code-block-header">
+                <span>Encryption Implementation</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>const ENCRYPTION_KEY = crypto.scryptSync(env.SESSION_SECRET, 'salt', 32);
+const IV_LENGTH = 16;
+
+function encrypt(text) {
+  let iv = crypto.randomBytes(IV_LENGTH);
+  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}</code></pre>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-icon" style="background: rgba(244, 63, 94, 0.15); color: #fb7185;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="panel-title">Horizontal Access Prevention</h3>
+                <p class="panel-subtitle">authMiddleware.js Multi-Tenant Isolation</p>
+              </div>
+            </div>
+            <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 14px;">
+              To prevent Insecure Direct Object Reference (IDOR) attacks, the middleware inspects URL parameters, query
+              parameters, and request body attributes. If an authenticated user from Department A attempts to query
+              Department B, the request is immediately terminated with HTTP 403 Forbidden.
+            </p>
+            <div class="code-block-wrapper">
+              <div class="code-block-header">
+                <span>Horizontal Barrier Implementation</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>const isDepartment = (req, res, next) => {
+  if (!req.session || req.session.role !== 'department') {
+    return res.status(401).json({ error: "Unauthorized: Department access required" });
+  }
+  const targetDept = req.params.dept_id || req.query.dept || req.body.dept_id;
+  if (targetDept && req.session.dept_id !== targetDept) {
+    return res.status(403).json({ error: "Forbidden: Cross-department access strictly prohibited" });
+  }
+  next();
+};</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 9: SERVICES & PORTS -->
+      <section class="doc-section" id="services-ports">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <div class="section-num-badge">09</div>
+            <h2 class="section-title">Environment Variables &amp; Network Ports</h2>
+          </div>
+        </div>
+        <p class="section-desc">Host ports, external cloud integrations, and environment variable requirements for local
+          development and production deployments.</p>
+
+        <div class="table-container" style="margin-bottom: 24px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Host / Port</th>
+                <th>Protocol</th>
+                <th>Role in Architecture</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Frontend Web Application</strong></td>
+                <td><code>localhost:5173</code></td>
+                <td>HTTP</td>
+                <td>Vite development server hosting React SPA</td>
+              </tr>
+              <tr>
+                <td><strong>Backend API &amp; Socket Server</strong></td>
+                <td><code>localhost:8081</code></td>
+                <td>HTTP / WS</td>
+                <td>Express 5 REST API and Socket.IO real-time server</td>
+              </tr>
+              <tr>
+                <td><strong>MySQL Database Server</strong></td>
+                <td><code>localhost:3306</code></td>
+                <td>TCP / MySQL</td>
+                <td>Database: <code>college_feedback_system</code> (user: root)</td>
+              </tr>
+              <tr>
+                <td><strong>Groq LLM Inference API</strong></td>
+                <td><code>api.groq.com:443</code></td>
+                <td>HTTPS</td>
+                <td>External cloud LLM endpoint for SAGAR Copilot and Remarks</td>
+              </tr>
+              <tr>
+                <td><strong>Cloudinary CDN &amp; AI Media</strong></td>
+                <td><code>res.cloudinary.com:443</code></td>
+                <td>HTTPS</td>
+                <td>External image storage and AI face restoration</td>
+              </tr>
+              <tr>
+                <td><strong>Gmail SMTP Email Server</strong></td>
+                <td><code>smtp.gmail.com:465</code></td>
+                <td>SMTPS (SSL)</td>
+                <td>Student notification credential distribution mailer</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel-card">
+          <h3 class="panel-title" style="margin-bottom: 12px;">Required Environment Keys (.env Specification)</h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Variable Name</th>
+                  <th>Validation Rule (Zod)</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>SESSION_SECRET</code></td>
+                  <td><code>min(16)</code> string (Required)</td>
+                  <td>Signs express-session cookie and derives AES-256 scrypt encryption key.</td>
+                </tr>
+                <tr>
+                  <td><code>PORT</code></td>
+                  <td><code>string.optional().default("8081")</code></td>
+                  <td>Network port for the Express application server.</td>
+                </tr>
+                <tr>
+                  <td><code>GROQ_API_KEY</code></td>
+                  <td><code>string</code> (Required for AI)</td>
+                  <td>Authenticates with Groq SDK for model <code>openai/gpt-oss-120b</code>.</td>
+                </tr>
+                <tr>
+                  <td><code>CLOUDINARY_CLOUD_NAME</code></td>
+                  <td><code>string</code> (Required for photos)</td>
+                  <td>Cloudinary organization tenant identifier.</td>
+                </tr>
+                <tr>
+                  <td><code>CLOUDINARY_API_KEY</code></td>
+                  <td><code>string</code> (Required for photos)</td>
+                  <td>API authentication key for media transformations.</td>
+                </tr>
+                <tr>
+                  <td><code>CLOUDINARY_API_SECRET</code></td>
+                  <td><code>string</code> (Required for photos)</td>
+                  <td>Secret key for authorized Cloudinary image uploads and deletions.</td>
+                </tr>
+                <tr>
+                  <td><code>EMAIL_USER</code></td>
+                  <td><code>email string</code></td>
+                  <td>Google Gmail address used for Nodemailer SMTP transport.</td>
+                </tr>
+                <tr>
+                  <td><code>EMAIL_PASS</code></td>
+                  <td><code>16-character App Password</code></td>
+                  <td>App-specific password generated from Google Account Security.</td>
+                </tr>
+                <tr>
+                  <td><code>VITE_API_URL</code></td>
+                  <td><code>string URL (Frontend .env)</code></td>
+                  <td>Base URL for Axios client requests (default: <code>http://localhost:8081</code>).</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="doc-footer">
+        <div>
+          <strong>Maharaja Institute of Technology Mysore (MIT Mysore)</strong> — Student Feedback System
+        </div>
+        <div>
+
+        </div>
+      </footer>
+
+    </main>
+  </div>
+
+  <!-- Back to Top Button -->
+  <button class="back-to-top" id="backToTopBtn" onclick="scrollToTop()" title="Back to Top">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="18 15 12 9 6 15"></polyline>
+    </svg>
+  </button>
+
+  <script>
+    // Mobile Sidebar Drawer Controller
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      const isOpen = sidebar.classList.contains('open');
+      if (isOpen) {
+        closeMobileSidebar();
+      } else {
+        sidebar.classList.add('open');
+        backdrop.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      }
+    }
+
+    function closeMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar) sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Reliable Nav Link Click Handler
+    function handleNavClick(e, targetId) {
+      if (e) e.preventDefault();
+
+      // 1. Reset any search filter so target section is visible
+      clearSearch(false);
+
+      // 2. Find target section
+      const targetElement = document.getElementById(targetId);
+      if (targetElement) {
+        targetElement.style.display = 'block';
+
+        // 3. Smooth scroll with top offset
+        const mobileHeader = document.querySelector('.mobile-header');
+        const isMobile = window.innerWidth <= 1024;
+        const headerOffset = isMobile ? 70 : 20;
+        const elementPosition = targetElement.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+        window.scrollTo({
+          top: Math.max(0, offsetPosition),
+          behavior: 'smooth'
+        });
+
+        // 4. Update active link classes immediately
+        document.querySelectorAll('.nav-link').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === `#${targetId}`) {
+            link.classList.add('active');
+          }
+        });
+
+        // 5. Update browser history hash
+        history.pushState(null, null, `#${targetId}`);
+
+        // 6. Close mobile sidebar if open
+        closeMobileSidebar();
+      }
+    }
+
+    // Dark / Light Mode Toggle
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('cfs_theme', newTheme);
+    }
+
+    // Restore Theme
+    const savedTheme = localStorage.getItem('cfs_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // Quick Documentation Search
+    function filterDocs() {
+      const input = document.getElementById('docSearch').value.toLowerCase().trim();
+      const clearBtn = document.getElementById('searchClearBtn');
+      const sections = document.querySelectorAll('.doc-section');
+
+      if (clearBtn) {
+        clearBtn.style.display = input.length > 0 ? 'block' : 'none';
+      }
+
+      sections.forEach(section => {
+        const text = section.innerText.toLowerCase();
+        if (input === '' || text.includes(input)) {
+          section.style.display = 'block';
+        } else {
+          section.style.display = 'none';
+        }
+      });
+    }
+
+    function clearSearch(focus = true) {
+      const input = document.getElementById('docSearch');
+      const clearBtn = document.getElementById('searchClearBtn');
+      if (input) {
+        input.value = '';
+        if (focus) input.focus();
+      }
+      if (clearBtn) clearBtn.style.display = 'none';
+      document.querySelectorAll('.doc-section').forEach(section => {
+        section.style.display = 'block';
+      });
+    }
+
+    // Copy Code to Clipboard
+    function copyCode(button) {
+      const pre = button.parentElement.nextElementSibling;
+      const code = pre.querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const originalText = button.innerText;
+        button.innerText = 'Copied!';
+        setTimeout(() => {
+          button.innerText = originalText;
+        }, 2000);
+      });
+    }
+
+    // Scroll to Top
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      const firstLink = document.querySelector('.nav-link[href="#overview"]');
+      if (firstLink) firstLink.classList.add('active');
+    }
+
+    // Back to Top Button Visibility on Scroll
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (window.scrollY > 400) {
+        btn.classList.add('visible');
+      } else {
+        btn.classList.remove('visible');
+      }
+    }, { passive: true });
+
+    // Modern High-Precision IntersectionObserver for Scroll-Spy Active Link
+    const observerOptions = {
+      root: null,
+      rootMargin: '-10% 0px -70% 0px',
+      threshold: 0
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.getAttribute('id');
+          if (id) {
+            document.querySelectorAll('.nav-link').forEach(link => {
+              if (link.getAttribute('href') === `#${id}`) {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+              }
+            });
+          }
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.doc-section').forEach(sec => {
+      observer.observe(sec);
+    });
+
+    // Handle URL hash on initial page load
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.location.hash) {
+        const hashId = window.location.hash.substring(1);
+        setTimeout(() => {
+          handleNavClick(null, hashId);
+        }, 100);
+      }
+    });
+  </script>
+
+</body>
+
+</html>
