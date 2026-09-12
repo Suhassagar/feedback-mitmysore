@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import useCopilotStore from '../../store/useCopilotStore';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
+import { API_BASE_URL } from '../../services/apiClient';
 import GenerativeChart from './GenerativeChart';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -9,7 +10,7 @@ import { X, Mic } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Initialize socket outside component to prevent multiple connections
-const socket = io(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081', {
+const socket = io(API_BASE_URL, {
   autoConnect: false,
   withCredentials: true
 });

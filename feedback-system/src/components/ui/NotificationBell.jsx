@@ -3,6 +3,7 @@ import { Bell, CheckCircle, Shield } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { io } from "socket.io-client";
 import { useDepartmentStore } from "../../store/useDepartmentStore";
+import { API_BASE_URL } from "../../services/apiClient";
 
 export default function NotificationBell({ dept_id }) {
   const notifRef = useRef(null);
@@ -26,7 +27,7 @@ export default function NotificationBell({ dept_id }) {
     loadPendingRegistrations(dept_id);
 
     // WebSocket Listener for real-time notifications
-    const socket = io(import.meta.env.VITE_API_URL || "http://localhost:8081", { withCredentials: true });
+    const socket = io(API_BASE_URL, { withCredentials: true });
     socket.emit("register_dashboard", { dept_id });
     
     socket.on("NEW_FEEDBACK_RECEIVED", (data) => {

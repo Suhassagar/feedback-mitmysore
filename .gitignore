@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.*
 *.env
+!feedback-system/.env.production
 
 # Build output
 dist/
