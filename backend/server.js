@@ -148,14 +148,20 @@ app.use(express.json());
 // --- Session setup ---
 app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind a load balancer/reverse proxy)
 
-const dbOptions = {
+const sessionPool = mysql.createPool({
   host: process.env.DB_HOST || "127.0.0.1",
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_NAME || "college_feedback_system",
   port: Number(process.env.DB_PORT) || 3306,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
-  createDatabaseTable: true,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+const sessionStore = new MySQLStore({
+  createDatabaseTable: false,
   schema: {
     tableName: 'express_sessions',
     columnNames: {
@@ -164,8 +170,7 @@ const dbOptions = {
       data: 'data'
     }
   }
-};
-const sessionStore = new MySQLStore(dbOptions);
+}, sessionPool);
 
 app.use(
   session({
