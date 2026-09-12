@@ -9,10 +9,20 @@ const dbOptions = {
     database: process.env.DB_NAME || "college_feedback_system",
     port: Number(process.env.DB_PORT) || 3306,
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    connectTimeout: 30000,
   },
   pool: { 
-    min: 2, 
-    max: 150 
+    min: 0, 
+    max: 25,
+    acquireTimeoutMillis: 60000,
+    idleTimeoutMillis: 30000,
+    afterCreate: (conn, done) => {
+      conn.query('SET NAMES utf8mb4;', (err) => {
+        done(err, conn);
+      });
+    }
   }
 };
 

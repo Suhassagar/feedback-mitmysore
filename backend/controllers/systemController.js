@@ -37,9 +37,18 @@ const getDepartments = async (req, res) => {
     const rows = await db('department')
       .where({ is_active: true })
       .select('dept_id', 'dept_name', 'is_active');
-    res.json(rows);
+    return res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: "Failed" });
+    console.warn("[getDepartments] Connection error on first attempt, retrying with fresh connection...", err.message);
+    try {
+      const retryRows = await db('department')
+        .where({ is_active: true })
+        .select('dept_id', 'dept_name', 'is_active');
+      return res.json(retryRows);
+    } catch (retryErr) {
+      console.error("[getDepartments FATAL]:", retryErr.message);
+      return res.status(500).json({ error: "Failed to load departments" });
+    }
   }
 };
 

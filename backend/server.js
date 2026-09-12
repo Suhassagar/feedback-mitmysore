@@ -67,7 +67,7 @@ const io = new Server(server, {
       if (isOriginAllowed(origin)) {
         return callback(null, true);
       }
-      return callback(new Error("CORS origin denied"), false);
+      return callback(null, false);
     },
     methods: ["POST", "GET", "PUT", "DELETE", "PATCH"],
     credentials: true,
@@ -142,7 +142,7 @@ app.use(
       if (isOriginAllowed(origin)) {
         return callback(null, true);
       }
-      return callback(new Error("CORS origin denied"), false);
+      return callback(null, false);
     },
     methods: ["POST", "GET", "PUT", "DELETE", "PATCH"],
     credentials: true, // allow cookies
@@ -164,7 +164,10 @@ const sessionPool = mysql.createPool({
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  connectTimeout: 30000
 });
 
 const sessionStore = new MySQLStore({

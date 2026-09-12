@@ -18,9 +18,20 @@ export default function HomePortal() {
   const [departments, setDepartments] = useState([]);
 
   useEffect(() => {
-    apiClient.get("/departments")
-      .then(res => setDepartments(res.data))
-      .catch(err => console.error("Error loading departments:", err));
+    let isMounted = true;
+    const fetchDepts = async (attempts = 2) => {
+      try {
+        const res = await apiClient.get("/departments");
+        if (isMounted) setDepartments(res.data);
+      } catch (err) {
+        if (attempts > 1) {
+          setTimeout(() => fetchDepts(attempts - 1), 2000);
+        } else {
+          console.warn("Could not load departments initially (Render cold start):", err?.message);
+        }
+      }
+    };
+    fetchDepts();
 
     const role = localStorage.getItem("role");
     if (role === "admin") {
@@ -29,6 +40,10 @@ export default function HomePortal() {
       const storedDeptId = localStorage.getItem("dept_id");
       if (storedDeptId) navigate(`/department-dashboard/${storedDeptId}`);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const handleRegChange = (e) => {
