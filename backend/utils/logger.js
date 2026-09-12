@@ -3,8 +3,11 @@ const UAParser = require('ua-parser-js');
 
 const logActivity = async (req, dept_id, action_type, entity, description) => {
   try {
-    let raw_ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
-    let ip_address = raw_ip;
+    let raw_ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || 'Unknown';
+    if (typeof raw_ip === 'string' && raw_ip.includes(',')) {
+      raw_ip = raw_ip.split(',')[0].trim();
+    }
+    let ip_address = String(raw_ip).substring(0, 95);
     
     // Clean up local IP addresses
     if (raw_ip === '::1' || raw_ip === '127.0.0.1' || raw_ip === '::ffff:127.0.0.1') {

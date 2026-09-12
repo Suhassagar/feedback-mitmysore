@@ -159,14 +159,14 @@ const rejectFaculty = async (req, res) => {
 const updateFaculty = async (req, res) => {
   const { faculty_id } = req.params;
   const { name, email, position, dob, joining_date } = req.body;
-  const dept_id = req.session.dept_id;
+  const dept_id = req.session?.dept_id || req.query.dept_id || req.body?.dept_id;
 
   try {
     const safeDob = dob || null;
     const safeJoiningDate = joining_date || null;
-    await db('global_faculty')
-      .where({ faculty_id, dept_id })
-      .update({ name, email, position, dob: safeDob, joining_date: safeJoiningDate });
+    const q = db('global_faculty').where({ faculty_id });
+    if (dept_id) q.andWhere({ dept_id });
+    await q.update({ name, email, position, dob: safeDob, joining_date: safeJoiningDate });
       
     res.json({ success: true, message: "Faculty updated" });
   } catch (err) {
@@ -179,25 +179,26 @@ const updateFaculty = async (req, res) => {
 //=========================================================
 const deleteFaculty = async (req, res) => {
   const { faculty_id } = req.params;
-  const dept_id = req.session.dept_id;
+  const dept_id = req.session?.dept_id || req.query.dept_id || req.body?.dept_id;
 
   const trx = await db.transaction();
   try {
-    const faculty = await trx('global_faculty').where({ faculty_id, dept_id }).first();
+    const q = trx('global_faculty').where({ faculty_id });
+    if (dept_id) q.andWhere({ dept_id });
+    const faculty = await q.first();
     if (!faculty) {
       await trx.rollback();
       return res.status(404).json({ success: false, message: "Faculty not found" });
     }
+    const actualDeptId = faculty.dept_id;
 
-    await trx('global_directory').where({ user_id: faculty.email, role: 'faculty', dept_id }).del();
-    await trx('global_assign').where({ faculty_id, dept_id }).del();
-    await trx('global_student_feedback').where({ faculty_id, dept_id }).del();
-    await trx('global_faculty_notes').where({ faculty_id, dept_id }).del();
-    await trx('global_faculty').where({ faculty_id, dept_id }).del();
+    await trx('global_directory').where({ user_id: faculty.email, role: 'faculty' }).del();
+    await trx('global_assign').where({ faculty_id, dept_id: actualDeptId }).del();
+    await trx('global_student_feedback').where({ faculty_id, dept_id: actualDeptId }).del();
+    await trx('global_faculty_notes').where({ faculty_id, dept_id: actualDeptId }).del();
+    await trx('global_faculty').where({ faculty_id, dept_id: actualDeptId }).del();
     
-    if (req.session?.role === 'department') {
-      await logActivity(req, dept_id, 'DELETE', 'FACULTY', `Deleted faculty member ${faculty_id}`);
-    }
+    await logActivity(req, actualDeptId, 'DELETE', 'FACULTY', `Deleted faculty member ${faculty_id}`);
 
     await trx.commit();
     res.json({ success: true, message: "Faculty deleted permanently" });
@@ -219,10 +220,11 @@ const bulkUploadFaculty = async (req, res) => {
   const trx = await db.transaction();
   try {
     let insertedCount = 0;
+    // Hash default password once before loop to prevent freezing Node.js event loop
+    const defaultPassword = await bcrypt.hash("Fac@2007", 10);
     
     for (const f of faculty) {
       const email = f.email || `${f.faculty_id}@mit.gmail.com`;
-      const password = await bcrypt.hash("Fac@2007", 10);
       
       // Upsert global_faculty
       const existing = await trx('global_faculty').where({ faculty_id: f.faculty_id }).first();
@@ -232,7 +234,7 @@ const bulkUploadFaculty = async (req, res) => {
           dept_id,
           name: f.name,
           email,
-          password
+          password: defaultPassword
         });
         insertedCount++;
       }

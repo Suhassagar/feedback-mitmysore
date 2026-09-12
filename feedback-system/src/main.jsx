@@ -20,14 +20,22 @@ axios.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Global Security Tripwire: Catch all 401/403 errors and force logout
+// Global Security Tripwire: Catch all 401/403 errors and force logout, EXCEPT during login attempts
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+    const isAuthAttempt = error.config?.url && (
+      error.config.url.includes('/auth/student-login') ||
+      error.config.url.includes('/auth/admin-login') ||
+      error.config.url.includes('/auth/department-login') ||
+      error.config.url.includes('/auth/faculty-login') ||
+      error.config.url.includes('/auth/check-session')
+    );
+
+    if (!isAuthAttempt && error.response && (error.response.status === 401 || error.response.status === 403)) {
       console.warn("Security Tripwire Triggered: Unauthorized access detected.");
       localStorage.removeItem("role");
-      window.location.href = "/"; // Force kick out to login screen
+      window.location.href = "/";
     }
     return Promise.reject(error);
   }

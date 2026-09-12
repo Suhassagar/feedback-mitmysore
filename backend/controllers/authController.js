@@ -123,11 +123,13 @@ const studentLogin = async (req, res) => {
       });
     }
     
-    // Mark student as pending (active in the system) if they haven't submitted yet
+    // Bind student to current active session and mark as pending if not done
     await db('global_students')
       .where({ usn, dept_id })
-      .andWhere('feedback_given', 'missing')
-      .update({ feedback_given: 'pending' });
+      .update({
+        session_id,
+        feedback_given: db.raw("CASE WHEN feedback_given = 'done' THEN 'done' ELSE 'pending' END")
+      });
     
     req.session.role = 'student';
     req.session.dept_id = dept_id;

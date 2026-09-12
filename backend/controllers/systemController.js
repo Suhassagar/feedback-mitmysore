@@ -34,7 +34,9 @@ function decrypt(text) {
 
 const getDepartments = async (req, res) => {
   try {
-    const rows = await db('department').where({ is_active: true });
+    const rows = await db('department')
+      .where({ is_active: true })
+      .select('dept_id', 'dept_name', 'is_active');
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: "Failed" });

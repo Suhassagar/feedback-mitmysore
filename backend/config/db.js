@@ -18,4 +18,14 @@ const dbOptions = {
 
 const db = knex(dbOptions);
 
+// Self-healing: Ensure required tables exist on boot
+db.schema.hasTable('global_used_tokens').then(exists => {
+  if (!exists) {
+    return db.schema.createTable('global_used_tokens', table => {
+      table.string('token', 100).primary();
+      table.timestamp('created_at').defaultTo(db.fn.now());
+    }).then(() => console.log('✅ Created missing global_used_tokens table in database'));
+  }
+}).catch(e => console.error('Auto-migration warning:', e.message));
+
 module.exports = db;

@@ -205,16 +205,24 @@ const notifyStudents = async (req, res) => {
     let successCount = 0;
     let failCount = 0;
 
-    const emailPromises = students.map(student => 
-      sendFeedbackEmail(student.email, student.name, student.usn, session_id)
-        .then(() => successCount++)
-        .catch((err) => {
-          console.error(`Failed to send email to ${student.email}:`, err);
-          failCount++;
-        })
-    );
-
-    await Promise.allSettled(emailPromises);
+    // Send emails in controlled batches of 5 to respect Gmail SMTP rate limits
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < students.length; i += BATCH_SIZE) {
+      const batch = students.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(student =>
+          sendFeedbackEmail(student.email, student.name, student.usn, session_id)
+            .then(() => successCount++)
+            .catch((err) => {
+              console.error(`Failed to send email to ${student.email}:`, err.message);
+              failCount++;
+            })
+        )
+      );
+      if (i + BATCH_SIZE < students.length) {
+        await new Promise(r => setTimeout(r, 300)); // 300ms breather between batches
+      }
+    }
 
     res.json({ 
       success: true, 

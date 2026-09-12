@@ -212,8 +212,15 @@ const setupCopilotSocket = (io) => {
     let messages = []; // Track conversation history
 
     socket.on("init_copilot", async (data) => {
-      const dept_id = socket.dept_id || data.dept_id;
+      const dept_id = socket.dept_id || data?.dept_id;
       if (!dept_id) return;
+
+      const deptExists = await db('department').where({ dept_id, is_active: true }).first();
+      if (!deptExists) {
+        socket.emit("copilot_stream", { text: "⚠️ Department not found or inactive." });
+        socket.emit("copilot_stream_end");
+        return;
+      }
 
       try {
         if (!process.env.GROQ_API_KEY) {
@@ -248,7 +255,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
 
         const stream = await groq.chat.completions.create({
           messages: messages,
-          model: "openai/gpt-oss-120b",
+          model: "llama-3.3-70b-versatile",
           stream: true,
         });
         
@@ -292,7 +299,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
         // --- ROUTER AGENT (Swarm Orchestration) ---
         const routerResponse = await groq.chat.completions.create({
           messages: [{ role: "system", content: "Classify user intent into ONE exact word: NAVIGATION, ANALYTICS, ACTION, or GENERAL. Example: 'take me to settings' -> NAVIGATION. 'show me top faculty' -> ANALYTICS. 'approve all' -> ACTION. 'hello' -> GENERAL." }, { role: "user", content: data.message }],
-          model: "openai/gpt-oss-120b",
+          model: "llama-3.3-70b-versatile",
           max_tokens: 10,
           temperature: 0.1
         });
@@ -318,7 +325,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
         
         const apiPayload = {
           messages: payloadMessages,
-          model: "openai/gpt-oss-120b",
+          model: "llama-3.3-70b-versatile",
           stream: true,
         };
         
@@ -592,7 +599,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
            
            const finalStream = await groq.chat.completions.create({
              messages: messages,
-             model: "openai/gpt-oss-120b",
+             model: "llama-3.3-70b-versatile",
              stream: true,
              tools: copilotTools,
              tool_choice: "auto"

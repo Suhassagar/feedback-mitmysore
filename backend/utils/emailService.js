@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
+const fs = require('fs');
 
 const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -7,14 +8,14 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   }
 
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // You can change this if using another provider like SendGrid
+    service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
   });
 
-  const loginUrl = 'http://localhost:5173/'; // Assuming default dev port for frontend
+  const loginUrl = process.env.FRONTEND_URL || 'https://feedback-mitmysore.vercel.app';
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -85,18 +86,22 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
     </html>
   `;
 
+  const attachments = [];
+  const logoPath = path.join(__dirname, '../../feedback-system/public/logo.jpeg');
+  if (fs.existsSync(logoPath)) {
+    attachments.push({
+      filename: 'logo.jpeg',
+      path: logoPath,
+      cid: 'collegelogo'
+    });
+  }
+
   const mailOptions = {
     from: `"College Admin" <${process.env.EMAIL_USER}>`,
     to: studentEmail,
     subject: `Action Required: New Feedback Session (${sessionId})`,
     html: htmlContent,
-    attachments: [
-      {
-        filename: 'logo.jpeg',
-        path: path.join(__dirname, '../../feedback-system/public/logo.jpeg'),
-        cid: 'collegelogo' // same cid value as in the html img src
-      }
-    ]
+    attachments
   };
 
   await transporter.sendMail(mailOptions);

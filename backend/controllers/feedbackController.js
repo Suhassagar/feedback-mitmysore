@@ -83,13 +83,13 @@ const submitFeedback = async (req, res) => {
 
     // Lock the student row to prevent race conditions
     const studentRow = await trx('global_students')
-      .where({ usn: student.usn, session_id: student.session_id, dept_id })
-      .select('feedback_given')
+      .where({ usn: student.usn, dept_id })
+      .select('feedback_given', 'session_id')
       .forUpdate()
       .first();
 
     if (!studentRow) {
-      throw new Error("Student session not found");
+      throw new Error("Student record not found");
     }
 
     if (studentRow.feedback_given === "done") {
@@ -127,8 +127,8 @@ const submitFeedback = async (req, res) => {
 
     // Mark feedback as done for this student
     await trx('global_students')
-      .where({ usn: student.usn, session_id: student.session_id, dept_id })
-      .update({ feedback_given: 'done' });
+      .where({ usn: student.usn, dept_id })
+      .update({ session_id, feedback_given: 'done' });
     
     // Save optional department remark anonymously
     if (department_remark && department_remark.trim() !== "") {

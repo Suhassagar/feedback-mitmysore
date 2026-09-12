@@ -21,8 +21,15 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Check if error response exists and handle specific status codes
-    if (error.response) {
+    const isAuthAttempt = error.config?.url && (
+      error.config.url.includes('/auth/student-login') ||
+      error.config.url.includes('/auth/admin-login') ||
+      error.config.url.includes('/auth/department-login') ||
+      error.config.url.includes('/auth/faculty-login') ||
+      error.config.url.includes('/auth/check-session')
+    );
+
+    if (!isAuthAttempt && error.response) {
       if (error.response.status === 401) {
         console.warn("Unauthorized access - redirecting to login");
         localStorage.removeItem('role');

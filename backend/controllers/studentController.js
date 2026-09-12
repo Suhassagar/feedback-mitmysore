@@ -28,10 +28,13 @@ const uploadStudents = async (req, res) => {
   try {
     let insertedCount = 0;
     for (const s of students) {
+      const targetDeptId = req.session?.role === 'department' ? req.session.dept_id : (s.dept_id || req.body.dept_id);
+      if (!targetDeptId) continue;
+
       // Upsert student
-      const existing = await trx('global_students').where({ usn: s.usn, dept_id: s.dept_id }).first();
+      const existing = await trx('global_students').where({ usn: s.usn, dept_id: targetDeptId }).first();
       if (existing) {
-        await trx('global_students').where({ usn: s.usn, dept_id: s.dept_id }).update({
+        await trx('global_students').where({ usn: s.usn, dept_id: targetDeptId }).update({
           name: s.name,
           sem: s.sem,
           section: s.section,
@@ -40,7 +43,7 @@ const uploadStudents = async (req, res) => {
       } else {
         await trx('global_students').insert({
           usn: s.usn,
-          dept_id: s.dept_id,
+          dept_id: targetDeptId,
           name: s.name,
           sem: s.sem,
           section: s.section,
@@ -51,12 +54,13 @@ const uploadStudents = async (req, res) => {
       
       // Upsert global_directory
       await trx('global_directory')
-        .insert({ user_id: s.usn, role: 'student', dept_id: s.dept_id })
+        .insert({ user_id: s.usn, role: 'student', dept_id: targetDeptId })
         .onConflict('user_id').ignore();
     }
 
-    if (req.session?.role === 'department' && students.length > 0) {
-      await logActivity(req, students[0].dept_id, 'UPLOAD', 'STUDENT', `Bulk uploaded/updated ${students.length} students`);
+    if (students.length > 0) {
+      const logDept = req.session?.dept_id || students[0].dept_id || 'ADMIN';
+      await logActivity(req, logDept, 'UPLOAD', 'STUDENT', `Bulk uploaded/updated ${students.length} students`);
     }
 
     await trx.commit();
@@ -73,15 +77,19 @@ const uploadStudents = async (req, res) => {
 //=========================================================
 const deleteStudent = async (req, res) => {
   const { usn } = req.params;
-  const dept_id = req.session.dept_id; // Assume dept context
+  const dept_id = req.session.dept_id || req.query.dept_id || req.body?.dept_id;
   const trx = await db.transaction();
   try {
-    await trx('global_directory').where({ user_id: usn, role: 'student', dept_id }).del();
-    await trx('global_students').where({ usn, dept_id }).del();
-    
-    if (req.session?.role === 'department') {
-      await logActivity(req, dept_id, 'DELETE', 'STUDENT', `Deleted student ${usn}`);
+    const dirQ = trx('global_directory').where({ user_id: usn, role: 'student' });
+    const studQ = trx('global_students').where({ usn });
+    if (dept_id) {
+      dirQ.andWhere({ dept_id });
+      studQ.andWhere({ dept_id });
     }
+    await dirQ.del();
+    await studQ.del();
+    
+    await logActivity(req, dept_id || 'ADMIN', 'DELETE', 'STUDENT', `Deleted student ${usn}`);
     await trx.commit();
     res.json({ message: "Student deleted successfully" });
   } catch (err) {
@@ -96,7 +104,7 @@ const deleteStudent = async (req, res) => {
 //=========================================================
 const bulkDeleteStudents = async (req, res) => {
   const { usns } = req.body;
-  const dept_id = req.session.dept_id;
+  const dept_id = req.session.dept_id || req.query.dept_id || req.body?.dept_id;
 
   if (!usns || !Array.isArray(usns) || usns.length === 0) {
     return res.status(400).json({ error: "Invalid payload" });
@@ -104,12 +112,16 @@ const bulkDeleteStudents = async (req, res) => {
 
   const trx = await db.transaction();
   try {
-    await trx('global_directory').whereIn('user_id', usns).andWhere({ role: 'student', dept_id }).del();
-    await trx('global_students').whereIn('usn', usns).andWhere({ dept_id }).del();
-    
-    if (req.session?.role === 'department') {
-      await logActivity(req, dept_id, 'DELETE', 'STUDENT', `Bulk deleted ${usns.length} students`);
+    const dirQ = trx('global_directory').whereIn('user_id', usns).andWhere({ role: 'student' });
+    const studQ = trx('global_students').whereIn('usn', usns);
+    if (dept_id) {
+      dirQ.andWhere({ dept_id });
+      studQ.andWhere({ dept_id });
     }
+    await dirQ.del();
+    await studQ.del();
+    
+    await logActivity(req, dept_id || 'ADMIN', 'DELETE', 'STUDENT', `Bulk deleted ${usns.length} students`);
     await trx.commit();
     res.json({ message: `Successfully deleted ${usns.length} students` });
   } catch (err) {

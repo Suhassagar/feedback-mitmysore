@@ -8,7 +8,7 @@ import PageTransition from "../components/PageTransition";
 export default function FeedbackForm() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { session_id } = location.state || {};
+  const session_id = location.state?.session_id || sessionStorage.getItem('active_feedback_session_id');
 
   const [loading, setLoading] = useState(true);
   const [facultyList, setFacultyList] = useState([]);
@@ -26,6 +26,7 @@ export default function FeedbackForm() {
       navigate("/student-login");
       return;
     }
+    sessionStorage.setItem('active_feedback_session_id', session_id);
 
     const fetchData = async () => {
       try {
@@ -119,6 +120,13 @@ export default function FeedbackForm() {
         },
         { withCredentials: true }
       );
+
+      sessionStorage.removeItem('active_feedback_session_id');
+      try {
+        await apiClient.post('/auth/logout');
+      } catch (logoutErr) {
+        // Continue navigation even if logout times out
+      }
 
       toast.success("Feedback submitted successfully!");
       navigate("/");

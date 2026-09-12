@@ -92,7 +92,7 @@ ${remarksText}
     
     const result = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "openai/gpt-oss-120b" // High-performance open-source model
+      model: "llama-3.3-70b-versatile"
     });
     
     const ai_summary = result.choices[0]?.message?.content || "";
