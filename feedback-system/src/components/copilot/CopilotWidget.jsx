@@ -9,7 +9,7 @@ import { X, Mic } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Initialize socket outside component to prevent multiple connections
-const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081', {
+const socket = io(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081', {
   autoConnect: false,
   withCredentials: true
 });
