@@ -3,6 +3,8 @@ const db = require('../config/db');
 const { createSession } = require('./sessionController');
 const bcrypt = require('bcrypt');
 
+const AI_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+
 // Define tools (Function Calling Schema for OpenAI/Groq)
 const copilotTools = [
   {
@@ -255,7 +257,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
 
         const stream = await groq.chat.completions.create({
           messages: messages,
-          model: "llama-3.3-70b-versatile",
+          model: AI_MODEL,
           stream: true,
         });
         
@@ -299,7 +301,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
         // --- ROUTER AGENT (Swarm Orchestration) ---
         const routerResponse = await groq.chat.completions.create({
           messages: [{ role: "system", content: "Classify user intent into ONE exact word: NAVIGATION, ANALYTICS, ACTION, or GENERAL. Example: 'take me to settings' -> NAVIGATION. 'show me top faculty' -> ANALYTICS. 'approve all' -> ACTION. 'hello' -> GENERAL." }, { role: "user", content: data.message }],
-          model: "llama-3.3-70b-versatile",
+          model: AI_MODEL,
           max_tokens: 10,
           temperature: 0.1
         });
@@ -325,7 +327,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
         
         const apiPayload = {
           messages: payloadMessages,
-          model: "llama-3.3-70b-versatile",
+          model: AI_MODEL,
           stream: true,
         };
         
@@ -599,7 +601,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
            
            const finalStream = await groq.chat.completions.create({
              messages: messages,
-             model: "llama-3.3-70b-versatile",
+             model: AI_MODEL,
              stream: true,
              tools: copilotTools,
              tool_choice: "auto"

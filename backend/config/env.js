@@ -6,6 +6,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET must be at least 16 characters long for security."),
   GEMINI_API_KEY: z.string().optional().describe("Used for AI Remarks. If missing, AI features will be disabled."),
+  BACKEND_URL: z.string().optional(),
+  RENDER_EXTERNAL_URL: z.string().optional(),
   // Add database vars if they were in .env, but right now they are hardcoded in db.js,
   // so we'll just validate the crucial secrets here.
 });

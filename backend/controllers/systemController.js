@@ -64,19 +64,8 @@ const addDepartment = async (req, res) => {
     const hashedPassword = await bcrypt.hash(pwd, 10);
     await trx('department').insert({ dept_id, dept_name, username, password: hashedPassword });
     
-    // Seed default feedback questions for the new department
-    const templateQuestions = await trx('global_feedback_questions').where({ dept_id: 'CSE' }).orWhere({ dept_id: 'cse' });
-    if (templateQuestions.length > 0) {
-      const seededQuestions = templateQuestions.map(q => ({
-        dept_id,
-        question_text: q.question_text,
-        question_heading: q.question_heading || 'General Feedback'
-      }));
-      await trx('global_feedback_questions').insert(seededQuestions);
-    }
-    
     await trx.commit();
-    res.json({ success: true, message: "Department created and initialized successfully" });
+    res.json({ success: true, message: "Department created successfully" });
   } catch (err) {
     await trx.rollback();
     console.error("Department add error:", err);

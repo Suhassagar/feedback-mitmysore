@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const Groq = require('groq-sdk');
+const AI_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
 //=========================================================
 // Get Remarks & Existing AI Summary
@@ -92,7 +93,7 @@ ${remarksText}
     
     const result = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "llama-3.3-70b-versatile"
+      model: AI_MODEL
     });
     
     const ai_summary = result.choices[0]?.message?.content || "";

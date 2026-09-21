@@ -152,6 +152,21 @@ app.use(
 // --- JSON parsing ---
 app.use(express.json());
 
+// --- Health / Ping Keep-Alive Endpoints ---
+// Fast endpoints for Render keep-alive and external monitors (e.g. cron-job.org / UptimeRobot)
+// Placed before express-session to bypass database session lookups entirely (<2ms response)
+app.get("/ping", (req, res) => {
+  res.status(200).json({ status: "alive", timestamp: new Date().toISOString() });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({ 
+    status: "ok", 
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString() 
+  });
+});
+
 // --- Session setup ---
 app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind a load balancer/reverse proxy)
 
@@ -219,7 +234,27 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 8081;
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+
+    // Self-ping to keep Render free tier awake if deployed or configured
+    const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL;
+    if (targetUrl) {
+      const intervalMinutes = 10;
+      const intervalMs = intervalMinutes * 60 * 1000;
+      const httpLib = targetUrl.startsWith("https") ? require("https") : require("http");
+
+      setInterval(() => {
+        httpLib.get(`${targetUrl}/ping`, (res) => {
+          console.log(`[Keep-Alive] Self-ping to ${targetUrl}/ping succeeded (status: ${res.statusCode})`);
+        }).on("error", (err) => {
+          console.warn(`[Keep-Alive] Self-ping warning: ${err.message}`);
+        });
+      }, intervalMs);
+
+      console.log(`[Keep-Alive] Configured keep-alive pinger for ${targetUrl}/ping every ${intervalMinutes} minutes.`);
+    }
+  });
 }
 
 module.exports = { app, server };
