@@ -37,24 +37,26 @@ export default function AdminMainDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let isMounted = true;
+    const loadData = async () => {
+      try {
+        const resMetrics = await apiClient.get("/admin/global-metrics", { withCredentials: true });
+        if (isMounted) setMetrics(resMetrics.data);
+
+        const resFaculties = await apiClient.get("/admin/global-faculties", { withCredentials: true });
+        const sortedFaculties = resFaculties.data.sort((a,b) => parseFloat(b.avg_rating || 0) - parseFloat(a.avg_rating || 0)).slice(0, 5);
+        if (isMounted) setTopFaculties(sortedFaculties);
+
+        const resDepts = await apiClient.get("/departments", { withCredentials: true });
+        if (isMounted) setDepartments(resDepts.data);
+      } catch (err) {
+        console.error("Error loading dashboard data:", err);
+      }
+    };
+
     loadData();
+    return () => { isMounted = false; };
   }, []);
-
-  const loadData = async () => {
-    try {
-      const resMetrics = await apiClient.get("/admin/global-metrics", { withCredentials: true });
-      setMetrics(resMetrics.data);
-
-      const resFaculties = await apiClient.get("/admin/global-faculties", { withCredentials: true });
-      const sortedFaculties = resFaculties.data.sort((a,b) => parseFloat(b.avg_rating || 0) - parseFloat(a.avg_rating || 0)).slice(0, 5);
-      setTopFaculties(sortedFaculties);
-
-      const resDepts = await apiClient.get("/departments", { withCredentials: true });
-      setDepartments(resDepts.data);
-    } catch (err) {
-      console.error("Error loading dashboard data:", err);
-    }
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>

@@ -190,9 +190,15 @@ const trackSession = async (req, res) => {
 //=========================================================
 const notifyStudents = async (req, res) => {
   const { session_id } = req.params;
-  const dept_id = req.session?.dept_id || req.body?.dept_id; // Added optional chaining
 
   try {
+    const session = await db('global_sessions').where({ session_id }).first();
+    if (!session) {
+      return res.status(404).json({ success: false, error: "Session not found." });
+    }
+
+    const dept_id = req.session?.dept_id || req.body?.dept_id || session.dept_id;
+
     const students = await db('global_students')
       .where({ session_id, dept_id })
       .whereNotNull('email')

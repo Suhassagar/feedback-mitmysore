@@ -12,9 +12,22 @@ export const API_BASE_URL =
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  timeout: 25000,
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Custom interceptor to bypass Brave's privacy mask
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.brave && await navigator.brave.isBrave()) {
+      config.headers['X-Browser-Override'] = 'Brave';
+    }
+  } catch {
+    // Ignore error if browser doesn't support it
+  }
+  return config;
 });
 
 // Response Interceptor for global error handling

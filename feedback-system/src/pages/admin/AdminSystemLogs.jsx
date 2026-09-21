@@ -17,17 +17,19 @@ export default function AdminSystemLogs() {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    loadLogs();
-  }, []);
+    let isMounted = true;
+    const loadLogs = async () => {
+      try {
+        const res = await apiClient.get("/admin/audit-logs", { withCredentials: true });
+        if (isMounted) setLogs(res.data);
+      } catch (err) {
+        console.error("Error loading audit logs:", err);
+      }
+    };
 
-  const loadLogs = async () => {
-    try {
-      const res = await apiClient.get("/admin/audit-logs", { withCredentials: true });
-      setLogs(res.data);
-    } catch (err) {
-      console.error("Error loading audit logs:", err);
-    }
-  };
+    loadLogs();
+    return () => { isMounted = false; };
+  }, []);
 
   const getStatusIcon = (status, action) => {
     if (status === 'error' || action.toLowerCase().includes('fail')) return <ShieldAlert color="#EF4444" size={18} />;

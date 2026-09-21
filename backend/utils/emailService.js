@@ -17,6 +17,23 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
 
   const loginUrl = process.env.FRONTEND_URL || 'https://feedback-mitmysore.vercel.app';
 
+  // Robust Logo Resolution: Check backend/public first, then monorepo frontend/public, fallback to live HTTPS
+  const localBackendLogo = path.join(__dirname, '../public/logo.jpeg');
+  const legacyFrontendLogo = path.join(__dirname, '../../feedback-system/public/logo.jpeg');
+  const resolvedLogoPath = fs.existsSync(localBackendLogo) ? localBackendLogo : (fs.existsSync(legacyFrontendLogo) ? legacyFrontendLogo : null);
+
+  const attachments = [];
+  let logoImgSrc = 'https://feedback-mitmysore.vercel.app/logo.jpeg';
+
+  if (resolvedLogoPath) {
+    attachments.push({
+      filename: 'logo.jpeg',
+      path: resolvedLogoPath,
+      cid: 'collegelogo'
+    });
+    logoImgSrc = 'cid:collegelogo';
+  }
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -31,7 +48,7 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
         <!-- Header with Gradient -->
         <div style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 40px 30px; text-align: center;">
           <div style="background: #ffffff; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 5px;">
-            <img src="cid:collegelogo" alt="MITM Logo" style="width: 100%; height: auto; border-radius: 50%; object-fit: contain;" />
+            <img src="${logoImgSrc}" alt="MITM Logo" style="width: 100%; height: auto; border-radius: 50%; object-fit: contain;" />
           </div>
           <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Feedback Session Live</h1>
           <p style="color: rgba(255,255,255,0.85); margin: 10px 0 0 0; font-size: 16px; font-weight: 500;">Your insights shape our future.</p>
@@ -85,16 +102,6 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
     </body>
     </html>
   `;
-
-  const attachments = [];
-  const logoPath = path.join(__dirname, '../../feedback-system/public/logo.jpeg');
-  if (fs.existsSync(logoPath)) {
-    attachments.push({
-      filename: 'logo.jpeg',
-      path: logoPath,
-      cid: 'collegelogo'
-    });
-  }
 
   const mailOptions = {
     from: `"College Admin" <${process.env.EMAIL_USER}>`,
