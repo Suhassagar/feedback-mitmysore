@@ -88,14 +88,27 @@ const studentLogin = async (req, res) => {
   if (!usn || !session_id)
     return res.status(400).json({ message: "USN and session ID are required" });
 
-  usn = usn.trim().toUpperCase();
-  session_id = session_id.trim();
+  usn = String(usn).trim().toUpperCase();
+  session_id = String(session_id).trim();
 
   try {
-    const dirRows = await db('global_directory').where({ user_id: usn, role: 'student' }).select('dept_id').limit(1);
-    if (dirRows.length === 0) return res.status(404).json({ message: "Student USN not found" });
+    // 1. Look up in global_directory
+    let dirRows = await db('global_directory').where({ user_id: usn, role: 'student' }).select('dept_id').limit(1);
+    let dept_id = dirRows.length > 0 ? dirRows[0].dept_id : null;
     
-    const dept_id = dirRows[0].dept_id;
+    // Fallback / self-heal: Check global_students directly if not found in directory
+    if (!dept_id) {
+      const directStudent = await db('global_students').whereRaw('UPPER(TRIM(usn)) = ?', [usn]).first();
+      if (directStudent) {
+        dept_id = directStudent.dept_id;
+        await db('global_directory')
+          .insert({ user_id: usn, role: 'student', dept_id })
+          .onConflict('user_id')
+          .merge({ dept_id, role: 'student' });
+      } else {
+        return res.status(404).json({ message: "Student USN not found" });
+      }
+    }
     
     const students = await db('global_students').where({ usn, dept_id }).limit(1);
     if (students.length === 0) {
@@ -117,18 +130,25 @@ const studentLogin = async (req, res) => {
       return res.status(403).json({ message: "This feedback session is not active" });
     }
 
-    if (students[0].sem !== session.sem || students[0].section !== session.section) {
+    // Robust comparison of sem and section (type-safe & case-insensitive)
+    const studentSem = parseInt(students[0].sem, 10);
+    const sessionSem = parseInt(session.sem, 10);
+    const studentSec = String(students[0].section || '').trim().toUpperCase();
+    const sessionSec = String(session.section || '').trim().toUpperCase();
+
+    if (studentSem !== sessionSem || studentSec !== sessionSec) {
       return res.status(403).json({ 
         message: `Access denied. This session is for Sem ${session.sem} Sec ${session.section}, but you are registered in Sem ${students[0].sem} Sec ${students[0].section}.` 
       });
     }
     
-    // Bind student to current active session and mark as pending if not done
+    // Bind student to current active session and mark as pending if not already completed for THIS session
+    const isAlreadyDoneThisSession = (students[0].session_id === session_id && students[0].feedback_given === 'done');
     await db('global_students')
       .where({ usn, dept_id })
       .update({
         session_id,
-        feedback_given: db.raw("CASE WHEN feedback_given = 'done' THEN 'done' ELSE 'pending' END")
+        feedback_given: isAlreadyDoneThisSession ? 'done' : 'pending'
       });
     
     req.session.role = 'student';

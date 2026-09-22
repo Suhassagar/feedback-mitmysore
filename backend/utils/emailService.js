@@ -15,15 +15,16 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
     },
   });
 
-  const loginUrl = process.env.FRONTEND_URL || 'https://feedback-mitmysore.vercel.app';
+  const loginUrl = process.env.FRONTEND_URL || 'https://mitmysore.vercel.app';
 
   // Robust Logo Resolution: Check backend/public first, then monorepo frontend/public, fallback to live HTTPS
   const localBackendLogo = path.join(__dirname, '../public/logo.jpeg');
+  const frontendLogo = path.join(__dirname, '../../frontend/public/logo.jpeg');
   const legacyFrontendLogo = path.join(__dirname, '../../feedback-system/public/logo.jpeg');
-  const resolvedLogoPath = fs.existsSync(localBackendLogo) ? localBackendLogo : (fs.existsSync(legacyFrontendLogo) ? legacyFrontendLogo : null);
+  const resolvedLogoPath = fs.existsSync(localBackendLogo) ? localBackendLogo : (fs.existsSync(frontendLogo) ? frontendLogo : (fs.existsSync(legacyFrontendLogo) ? legacyFrontendLogo : null));
 
   const attachments = [];
-  let logoImgSrc = 'https://feedback-mitmysore.vercel.app/logo.jpeg';
+  let logoImgSrc = 'https://mitmysore.vercel.app/logo.jpeg';
 
   if (resolvedLogoPath) {
     attachments.push({

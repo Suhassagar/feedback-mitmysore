@@ -211,22 +211,75 @@ const bulkUploadStudents = async (req, res) => {
   if (!dept_id || !students || !Array.isArray(students) || students.length === 0) {
     return res.status(400).json({ error: "Invalid payload" });
   }
+  const cleanDeptId = String(dept_id).trim().toUpperCase();
   const trx = await db.transaction();
   try {
     let insertedCount = 0;
     for (const s of students) {
-      await trx('global_students').insert({ usn: s.usn, name: s.name, sem: s.sem, section: s.section, email: s.email || null, dept_id })
-        .onConflict(['usn']).merge(['name', 'sem', 'section', 'email']);
-      await trx('global_directory').insert({ user_id: s.usn, role: 'student', dept_id }).onConflict(['user_id']).ignore();
-      insertedCount++;
+      if (!s.usn || !s.name) continue;
+      const cleanUsn = String(s.usn).trim().toUpperCase();
+      const cleanName = String(s.name).trim();
+      const cleanSem = parseInt(s.sem, 10);
+      const cleanSection = String(s.section || '').trim().toUpperCase();
+      const cleanEmail = s.email ? String(s.email).trim().toLowerCase() : null;
+
+      // Check if an active session exists for this department, semester, and section
+      const activeSession = await trx('global_sessions')
+        .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND status = ?', [cleanDeptId, cleanSem, cleanSection, 'active'])
+        .first();
+
+      const sessionIdToBind = activeSession ? activeSession.session_id : null;
+      const initialFeedback = activeSession ? 'missing' : null;
+
+      const existing = await trx('global_students')
+        .where({ usn: cleanUsn, dept_id: cleanDeptId })
+        .first();
+
+      if (existing) {
+        const updateData = {
+          name: cleanName,
+          sem: cleanSem,
+          section: cleanSection,
+          email: cleanEmail
+        };
+        // Auto-bind to active session if not already done in this session
+        if (activeSession && (existing.session_id !== activeSession.session_id || existing.feedback_given !== 'done')) {
+          updateData.session_id = sessionIdToBind;
+          updateData.feedback_given = initialFeedback;
+        }
+        await trx('global_students')
+          .where({ usn: cleanUsn, dept_id: cleanDeptId })
+          .update(updateData);
+      } else {
+        await trx('global_students').insert({
+          usn: cleanUsn,
+          dept_id: cleanDeptId,
+          name: cleanName,
+          sem: cleanSem,
+          section: cleanSection,
+          email: cleanEmail,
+          session_id: sessionIdToBind,
+          feedback_given: initialFeedback
+        });
+        insertedCount++;
+      }
+
+      // Upsert global_directory with uppercase user_id
+      await trx('global_directory')
+        .insert({ user_id: cleanUsn, role: 'student', dept_id: cleanDeptId })
+        .onConflict('user_id')
+        .merge({ dept_id: cleanDeptId, role: 'student' });
     }
+
     if (req.session?.role === 'department') {
-      await logActivity(req, dept_id, 'UPLOAD', 'STUDENT', `Bulk uploaded ${insertedCount} students`);
+      await logActivity(req, cleanDeptId, 'UPLOAD', 'STUDENT', `Bulk uploaded/processed ${students.length} students`);
     }
+
     await trx.commit();
     res.json({ message: "Bulk upload successful", inserted: insertedCount });
   } catch (err) {
     await trx.rollback();
+    console.error("Bulk upload students error:", err);
     res.status(500).json({ error: "DB error" });
   }
 };

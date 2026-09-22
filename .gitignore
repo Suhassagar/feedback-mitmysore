@@ -1,24 +1,45 @@
 # Dependencies
 node_modules/
+*/node_modules/
 
-# Environment variables
+# Environment variables & secrets
 .env
 .env.*
 *.env
-!feedback-system/.env.production
+!.env.example
+!*.env.example
+!**/.env.example
+!frontend/.env.production
 
-# Build output
+# Build outputs
 dist/
 build/
+*/dist/
 
-# IDE
+# IDE & Editor files
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# OS files
+# Operating System files
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
-# Logs
+# Logs & Error Dumps
 *.log
+*.log.*
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+error_log.txt
+*/error_log.txt
+
+# Scratch & Temporary Testing Scripts
+scratch/
+scratch_*.js
+backend/tests/test_socket.js

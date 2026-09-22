@@ -22,7 +22,7 @@
 
 | Component | Platform | Live URL / Endpoint | Details |
 | :--- | :--- | :--- | :--- |
-| **Frontend** | **Vercel** | `https://mitmysore.vercel.app`<br>`https://feedback-mitmysore.vercel.app` | Built from `feedback-system/` directory with Vite + React. |
+| **Frontend** | **Vercel** | `https://mitmysore.vercel.app` | Built from `frontend/` directory with Vite + React. |
 | **Backend API** | **Render** | `https://mit-feedback-api.onrender.com` | Web Service built from `backend/` directory with Node.js/Express. |
 | **Database** | **TiDB Cloud** | `gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000` | Serverless MySQL-compatible cloud database (`college_feedback_system`), SSL enabled. |
 | **Media CDN** | **Cloudinary** | Cloud Name: `dep3ok4l` | College logo, faculty avatars, image attachments. |
@@ -75,7 +75,7 @@ d:\college_feedback_system
 │   ├── .env.production                  # Production credentials (uses TiDB Cloud)
 │   └── server.js                        # Application entry point, CORS, Socket.IO, express-session
 │
-├── feedback-system/                     # React Single Page Application (Vite)
+├── frontend/                            # React Single Page Application (Vite)
 │   ├── src/
 │   │   ├── components/                  # Navbar, Modals, AdminLayout, CopilotChat, Charts
 │   │   ├── context/                     # AuthContext, ThemeContext
@@ -140,7 +140,7 @@ cd d:\college_feedback_system\backend
 npm start
 
 # 2. Start Local Frontend Dev Server (Port 5173)
-cd d:\college_feedback_system\feedback-system
+cd d:\college_feedback_system\frontend
 npm run dev
 ```
 Local test URL: **`http://localhost:5173/`**

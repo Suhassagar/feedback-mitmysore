@@ -7,39 +7,42 @@ const { sendFeedbackEmail } = require('../utils/emailService');
 //=========================================================
 const createSession = async (req, res) => {
   let { session_id, dept_id, sem, section } = req.body;
-  if (dept_id) dept_id = dept_id.toUpperCase();
+  if (!session_id || !dept_id || !sem || !section) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  dept_id = String(dept_id).trim().toUpperCase();
+  sem = parseInt(sem, 10);
+  section = String(section).trim().toUpperCase();
+  session_id = String(session_id).trim();
 
   const trx = await db.transaction();
   try {
-    // GATE 1: Student Check
+    // GATE 1: Student Check (case/type-safe)
     const students = await trx('global_students')
-      .where({ sem, section, dept_id })
+      .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ?', [dept_id, sem, section])
       .count('* as count')
       .first();
       
-    if (students.count === 0) {
+    if (!students || students.count === 0) {
       await trx.rollback();
       return res.status(400).json({ error: `Cannot create session: No students are currently registered in Sem ${sem} Section ${section}.` });
     }
 
     // GATE 2: Faculty/Course Assignment Check
-    // We check the new 'global_assign' table (assuming it's global now or we query by dept_id)
-    // Actually, 'assign' is a tenant table in the old code. We should have 'global_assign' from Phase 2.
-    // If not, we use 'global_assign' where dept_id = ? 
-    // Wait, let's just query 'global_assign'
     const assignments = await trx('global_assign')
-      .where({ sem, section, dept_id })
+      .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ?', [dept_id, sem, section])
       .count('* as count')
       .first();
 
-    if (assignments.count === 0) {
+    if (!assignments || assignments.count === 0) {
       await trx.rollback();
       return res.status(400).json({ error: `Cannot create session: No faculty have been assigned to teach Sem ${sem} Section ${section} yet.` });
     }
 
     // Check if an active session already exists
     const existing = await trx('global_sessions')
-      .where({ sem, section, dept_id, status: 'active' })
+      .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND status = ?', [dept_id, sem, section, 'active'])
       .forUpdate()
       .first();
 
@@ -54,7 +57,7 @@ const createSession = async (req, res) => {
     
     // ACTIVE TRACKING: Bind all eligible students to this new session immediately
     await trx('global_students')
-      .where({ sem, section, dept_id })
+      .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ?', [dept_id, sem, section])
       .update({ session_id, feedback_given: 'missing' });
     
     // Write to Audit Log
@@ -173,8 +176,16 @@ const trackSession = async (req, res) => {
     const session = await sessionQuery.first();
     if (!session) return res.status(404).json({ error: "Session not found" });
 
+    // Auto-heal: If session is active, bind any students in this sem/section who are missing session_id
+    if (session.status === 'active') {
+      await db('global_students')
+        .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND (session_id IS NULL OR session_id != ?)', [session.dept_id, session.sem, session.section, session.session_id])
+        .update({ session_id: session.session_id, feedback_given: 'missing' });
+    }
+
     const trackRows = await db('global_students')
-      .where({ session_id, sem: session.sem, section: session.section, dept_id: session.dept_id })
+      .where({ session_id, dept_id: session.dept_id })
+      .whereRaw('sem = ? AND UPPER(TRIM(section)) = ?', [session.sem, session.section])
       .select('usn', 'name', 'sem', 'section', db.raw("COALESCE(feedback_given, 'missing') as status"))
       .orderBy('usn', 'asc');
     
@@ -198,6 +209,13 @@ const notifyStudents = async (req, res) => {
     }
 
     const dept_id = req.session?.dept_id || req.body?.dept_id || session.dept_id;
+
+    // Auto-heal: Ensure newly added or re-added students in this sem/section are bound to the active session
+    if (session.status === 'active') {
+      await db('global_students')
+        .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND (session_id IS NULL OR session_id != ?)', [session.dept_id, session.sem, session.section, session.session_id])
+        .update({ session_id: session.session_id, feedback_given: 'missing' });
+    }
 
     const students = await db('global_students')
       .where({ session_id, dept_id })

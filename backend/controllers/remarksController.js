@@ -1,6 +1,11 @@
 const db = require('../config/db');
 const Groq = require('groq-sdk');
-const AI_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+const FALLBACK_MODEL = "qwen/qwen3.8-27b";
+let rawModel = process.env.GROQ_MODEL || FALLBACK_MODEL;
+if (rawModel === "llama-3.3-70b-versatile" || rawModel.includes("llama-3.3-70b")) {
+  rawModel = FALLBACK_MODEL;
+}
+const AI_MODEL = rawModel;
 
 //=========================================================
 // Get Remarks & Existing AI Summary

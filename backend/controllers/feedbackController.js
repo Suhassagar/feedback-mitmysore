@@ -92,7 +92,7 @@ const submitFeedback = async (req, res) => {
       throw new Error("Student record not found");
     }
 
-    if (studentRow.feedback_given === "done") {
+    if (studentRow.session_id === session_id && studentRow.feedback_given === "done") {
       throw new Error("Feedback already submitted");
     }
 

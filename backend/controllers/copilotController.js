@@ -3,7 +3,12 @@ const db = require('../config/db');
 const { createSession } = require('./sessionController');
 const bcrypt = require('bcrypt');
 
-const AI_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+const FALLBACK_MODEL = "qwen/qwen3.8-27b";
+let rawModel = process.env.GROQ_MODEL || FALLBACK_MODEL;
+if (rawModel === "llama-3.3-70b-versatile" || rawModel.includes("llama-3.3-70b")) {
+  rawModel = FALLBACK_MODEL;
+}
+const AI_MODEL = rawModel;
 
 // Define tools (Function Calling Schema for OpenAI/Groq)
 const copilotTools = [
