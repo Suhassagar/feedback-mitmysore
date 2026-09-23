@@ -177,7 +177,7 @@ export default function HomePortal() {
         </div>
 
         <div style={{ marginTop: "48px", color: "var(--text-secondary)", fontSize: "13px", textAlign: "center" }}>
-          Developed by Suhas J. Sagar | Department of CSE
+          Designed and developed by Suhas J. Sagar | Department of CSE
         </div>
 
         <div className="home-footer" style={{ marginTop: "16px" }}>

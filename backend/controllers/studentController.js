@@ -6,10 +6,42 @@ const { logActivity } = require('../utils/logger');
 //=========================================================
 const getStudents = async (req, res) => {
   const { dept_id } = req.params;
+  const page = req.query.page ? parseInt(req.query.page, 10) : null;
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+  const sem = req.query.sem ? parseInt(req.query.sem, 10) : null;
+  const search = req.query.search ? String(req.query.search).trim() : null;
+
   try {
-    const rows = await db('global_students')
-      .where({ dept_id })
-      .orderBy(['sem', 'section', 'usn']);
+    const cleanDept = String(dept_id).trim().toUpperCase();
+    let baseQuery = db('global_students').whereRaw('UPPER(dept_id) = ?', [cleanDept]);
+    if (sem) baseQuery = baseQuery.where({ sem });
+    if (search) {
+      baseQuery = baseQuery.where(function() {
+        this.where('usn', 'like', `%${search}%`).orWhere('name', 'like', `%${search}%`);
+      });
+    }
+
+    if (page && limit) {
+      const offset = (page - 1) * limit;
+      const countRes = await baseQuery.clone().count('* as count').first();
+      const rows = await baseQuery
+        .clone()
+        .orderBy(['sem', 'section', 'usn'])
+        .limit(limit)
+        .offset(offset);
+
+      return res.json({
+        data: rows,
+        pagination: {
+          total: countRes?.count || 0,
+          page,
+          limit,
+          totalPages: Math.ceil((countRes?.count || 0) / limit)
+        }
+      });
+    }
+
+    const rows = await baseQuery.orderBy(['sem', 'section', 'usn']);
     res.json(rows);
   } catch (err) {
     console.error("Error fetching students:", err);

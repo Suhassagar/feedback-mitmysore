@@ -38,4 +38,35 @@ db.schema.hasTable('global_used_tokens').then(exists => {
   }
 }).catch(e => console.error('Auto-migration warning:', e.message));
 
+// Self-healing: Ensure performance composite indexes exist on boot
+async function ensurePerformanceIndexes() {
+  try {
+    const feedbackExists = await db.schema.hasTable('global_student_feedback');
+    if (feedbackExists) {
+      await db.raw('ALTER TABLE global_student_feedback ADD INDEX idx_feedback_session_dept (session_id, dept_id)').catch(err => {
+        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
+          // Ignored if index already exists
+        }
+      });
+      await db.raw('ALTER TABLE global_student_feedback ADD INDEX idx_feedback_faculty_course (faculty_id, course_id, dept_id)').catch(err => {
+        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
+          // Ignored if index already exists
+        }
+      });
+    }
+
+    const studentsExists = await db.schema.hasTable('global_students');
+    if (studentsExists) {
+      await db.raw('ALTER TABLE global_students ADD INDEX idx_students_dept_sem_sec (dept_id, sem, section)').catch(err => {
+        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
+          // Ignored if index already exists
+        }
+      });
+    }
+  } catch (err) {
+    // Non-blocking background verification
+  }
+}
+ensurePerformanceIndexes();
+
 module.exports = db;

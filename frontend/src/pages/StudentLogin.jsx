@@ -37,7 +37,7 @@ export default function StudentLogin() {
 
   return (
     <PageTransition>
-      <div className="flex-center container flex-col" style={{ height: "100vh" }}>
+      <div className="flex-center container flex-col" style={{ minHeight: "100vh", height: "auto", padding: "24px 16px" }}>
         <div className="login-split-card theme-student">
           <div className="login-left-panel">
             {/* Student/Graduation Cap SVG */}

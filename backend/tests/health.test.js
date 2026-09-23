@@ -19,4 +19,10 @@ describe('Keep-Alive & Health Endpoints', () => {
     expect(res.body.status).toBe('ok');
     expect(typeof res.body.uptime).toBe('number');
   });
+
+  it('GET /health/email should verify SMTP configuration and respond with diagnostics', async () => {
+    const res = await request(app).get('/health/email');
+    expect(res.body).toHaveProperty('configured');
+    expect(res.body).toHaveProperty('timestamp');
+  });
 });

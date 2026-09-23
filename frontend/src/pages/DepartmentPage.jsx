@@ -141,7 +141,7 @@ function DepartmentPage() {
               <p>No faculty found for this department.</p>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "20px" }}>
               {faculties.map((f) => (
                 <div key={f.faculty_id} className="card flex-col gap-sm">
                   <h3 className="title-medium text-gradient" style={{ margin: 0 }}>{f.faculty_id}</h3>
@@ -192,7 +192,7 @@ function DepartmentPage() {
       {/* ---------- POPUP ADD FACULTY ---------- */}
       {showPopup && (
         <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000, padding: "20px" }}>
-          <div className="card flex-col gap-md" style={{ width: "100%", maxWidth: "450px" }}>
+          <div className="card flex-col gap-md" style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 className="title-medium" style={{ margin: 0 }}>Add New Faculty</h3>
 
             <div className="flex-col gap-sm">
@@ -221,7 +221,7 @@ function DepartmentPage() {
       {/* ---------- POPUP EDIT FACULTY ---------- */}
       {editFaculty && (
         <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000, padding: "20px" }}>
-          <div className="card flex-col gap-md" style={{ width: "100%", maxWidth: "450px" }}>
+          <div className="card flex-col gap-md" style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 className="title-medium" style={{ margin: 0 }}>Edit Faculty</h3>
 
             <div className="flex-col gap-sm">

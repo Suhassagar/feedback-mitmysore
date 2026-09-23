@@ -79,7 +79,7 @@ export default function AuditLogs() {
   return (
     <PageTransition>
       <div className="dashboard-content">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "24px" }}>
           <div>
             <h1 className="title-large" style={{ display: "flex", alignItems: "center", gap: "10px", margin: "0 0 8px 0" }}>
               <Shield color="var(--gold)" size={28} /> System Audit Logs
@@ -137,7 +137,7 @@ export default function AuditLogs() {
 
                   {/* Log Content */}
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
                       <h4 style={{ margin: 0, fontSize: "15px", color: "var(--text-primary)", fontWeight: "600" }}>
                         {log.description}
                       </h4>

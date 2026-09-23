@@ -167,6 +167,23 @@ app.get("/health", (req, res) => {
   });
 });
 
+app.get("/health/email", async (req, res) => {
+  try {
+    const { verifyEmailService } = require('./utils/emailService');
+    const result = await verifyEmailService();
+    res.status(result.success ? 200 : 500).json({
+      timestamp: new Date().toISOString(),
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      timestamp: new Date().toISOString(),
+      error: err.message
+    });
+  }
+});
+
 // --- Session setup ---
 app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind a load balancer/reverse proxy)
 

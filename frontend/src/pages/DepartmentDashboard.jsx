@@ -164,7 +164,7 @@ export default function DepartmentDashboard() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "24px", marginBottom: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "24px", marginBottom: "24px" }}>
         {/* Top Performing Faculty */}
         <div className="dash-card flex-col" style={{ gap: "20px", margin: 0, height: "100%" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -235,7 +235,7 @@ export default function DepartmentDashboard() {
       {/* CREATE SESSION MODAL */}
       {showCreateSessionModal && (
         <div className="glass-modal-overlay">
-          <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", borderRadius: "20px" }}>
+          <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px" }}>
             <h3 className="title-medium" style={{ margin: 0 }}>Create Feedback Session</h3>
             <div className="flex-col gap-sm">
               <label className="field-label">Session ID</label>
@@ -263,7 +263,7 @@ export default function DepartmentDashboard() {
       {/* ADD SUBJECT MODAL */}
       {showAddSubjectModal && (
         <div className="glass-modal-overlay">
-          <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", borderRadius: "20px" }}>
+          <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px" }}>
             <h3 className="title-medium" style={{ margin: 0 }}>Add New Subject</h3>
             <form onSubmit={handleAddSubject} className="flex-col gap-md">
               <div className="flex-col gap-sm">

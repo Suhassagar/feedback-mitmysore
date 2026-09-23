@@ -43,7 +43,7 @@ function AdminLogin() {
 
   return (
     <PageTransition>
-      <div className="flex-center container flex-col" style={{ height: "100vh" }}>
+      <div className="flex-center container flex-col" style={{ minHeight: "100vh", height: "auto", padding: "24px 16px" }}>
         <div className="login-split-card theme-admin">
           <div className="login-left-panel">
             {/* User Cog SVG */}

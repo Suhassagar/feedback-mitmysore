@@ -2,19 +2,75 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
 
-const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error("Email credentials not configured in .env file.");
+let cachedTransporter = null;
+
+const getTransporter = () => {
+  const cleanUser = String(process.env.EMAIL_USER || '').trim();
+  const cleanPass = String(process.env.EMAIL_PASS || '').replace(/\s+/g, '').trim();
+
+  if (!cleanUser || !cleanPass) {
+    throw new Error("Email credentials (EMAIL_USER / EMAIL_PASS) not configured in server environment.");
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  if (!cachedTransporter) {
+    cachedTransporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // SMTPS
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
+      auth: {
+        user: cleanUser,
+        pass: cleanPass,
+      },
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
+    });
+  }
 
+  return cachedTransporter;
+};
+
+const verifyEmailService = async () => {
+  const cleanUser = String(process.env.EMAIL_USER || '').trim();
+  const cleanPass = String(process.env.EMAIL_PASS || '').replace(/\s+/g, '').trim();
+
+  if (!cleanUser || !cleanPass) {
+    return {
+      success: false,
+      configured: false,
+      error: "EMAIL_USER or EMAIL_PASS environment variables are missing on the server."
+    };
+  }
+
+  try {
+    const transporter = getTransporter();
+    await transporter.verify();
+    return {
+      success: true,
+      configured: true,
+      sender: cleanUser,
+      message: "SMTP server is ready to deliver messages."
+    };
+  } catch (err) {
+    return {
+      success: false,
+      configured: true,
+      sender: cleanUser,
+      error: err.message,
+      code: err.code || 'SMTP_ERROR'
+    };
+  }
+};
+
+const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
+  const transporter = getTransporter();
+  const cleanUser = String(process.env.EMAIL_USER || '').trim();
   const loginUrl = process.env.FRONTEND_URL || 'https://mitmysore.vercel.app';
 
   // Robust Logo Resolution: Check backend/public first, then monorepo frontend/public, fallback to live HTTPS
@@ -105,7 +161,7 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   `;
 
   const mailOptions = {
-    from: `"College Admin" <${process.env.EMAIL_USER}>`,
+    from: `"College Admin" <${cleanUser}>`,
     to: studentEmail,
     subject: `Action Required: New Feedback Session (${sessionId})`,
     html: htmlContent,
@@ -115,4 +171,7 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   await transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendFeedbackEmail };
+module.exports = { 
+  sendFeedbackEmail,
+  verifyEmailService
+};

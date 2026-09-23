@@ -116,8 +116,8 @@ function AddCoursePage() {
             <input type="number" className="form-input" style={{ padding: "10px" }} placeholder="1-8" value={sem} onChange={(e) => setSem(e.target.value)} />
           </div>
           
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button className="btn" style={{ padding: "10px 20px", whiteSpace: "nowrap", height: "42px", border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }} onClick={() => setShowBulkModal(true)}>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", flex: "1 1 260px" }}>
+            <button className="btn" style={{ padding: "10px 20px", whiteSpace: "nowrap", height: "42px", border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flex: 1 }} onClick={() => setShowBulkModal(true)}>
               <Upload size={16} /> Bulk Import
             </button>
             <button 
@@ -133,7 +133,8 @@ function AddCoursePage() {
                 justifyContent: "center", 
                 gap: "6px", 
                 fontWeight: "600",
-                whiteSpace: "nowrap"
+                whiteSpace: "nowrap",
+                flex: 1
               }} 
               onClick={handleAddCourse}
             >
@@ -194,7 +195,7 @@ function AddCoursePage() {
         {/* EDIT SUBJECT MODAL */}
         {editCourse && (
           <div className="glass-modal-overlay">
-            <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", borderRadius: "20px" }}>
+            <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px" }}>
               <h3 className="title-medium" style={{ margin: 0 }}>Edit Subject</h3>
               <div className="flex-col gap-sm">
                 <label className="field-label">Subject Code (Read Only)</label>
