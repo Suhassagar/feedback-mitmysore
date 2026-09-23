@@ -291,7 +291,10 @@
   color: var(--text-secondary);
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: var(--space-8);
+  line-height: 1.5;
 }
 
 .home-footer a {
@@ -392,5 +395,16 @@
   .portal-icon-wrapper svg {
     width: 24px;
     height: 24px;
+  }
+
+  .home-portal-card p {
+    min-height: auto;
+    margin-bottom: var(--space-16);
+  }
+
+  .home-footer {
+    margin-top: var(--space-32);
+    justify-content: center;
+    text-align: center;
   }
 }

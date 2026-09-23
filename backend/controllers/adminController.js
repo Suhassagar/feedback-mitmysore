@@ -4,36 +4,39 @@ const bcrypt = require('bcrypt');
 
 const getGlobalMetrics = async (req, res) => {
   try {
-    const departments = await db('department').select('dept_id');
-    let totalStudents = 0, totalFaculty = 0, activeSessions = 0, completed = 0, total = 0;
-    let sumRating = 0, ratingCount = 0;
+    const [
+      studentsCount,
+      facultyCount,
+      activeSessionsCount,
+      feedbackStats,
+      completedCount,
+      totalAssignedCount
+    ] = await Promise.all([
+      db('global_students').count('* as c').first(),
+      db('global_faculty').count('* as c').first(),
+      db('global_sessions').where({ status: 'active' }).count('* as c').first(),
+      db('global_student_feedback').avg('rating as a').count('* as c').first(),
+      db('global_students').where({ feedback_given: 'done' }).count('* as c').first(),
+      db('global_students').whereNotNull('session_id').count('* as c').first()
+    ]);
 
-    for (let d of departments) {
-      const dept_id = d.dept_id;
-      
-      const sc = await db('global_students').where({ dept_id }).count('* as c').first();
-      const fc = await db('global_faculty').where({ dept_id }).count('* as c').first();
-      const as = await db('global_sessions').where({ dept_id, status: 'active' }).count('* as c').first();
-      const sf = await db('global_student_feedback').where({ dept_id }).avg('rating as a').count('* as c').first();
-      const st = await db('global_students').where({ dept_id, feedback_given: 'done' }).count('* as c').first();
-      const to = await db('global_students').where({ dept_id }).whereNotNull('session_id').count('* as c').first();
-
-      totalStudents += sc.c || 0;
-      totalFaculty += fc.c || 0;
-      activeSessions += as.c || 0;
-      if (sf.a) { sumRating += parseFloat(sf.a) * sf.c; ratingCount += sf.c; }
-      completed += st.c || 0;
-      total += to.c || 0;
-    }
-
-    const globalRating = ratingCount > 0 ? (sumRating / ratingCount).toFixed(2) : "0.00";
+    const totalStudents = studentsCount?.c || 0;
+    const totalFaculty = facultyCount?.c || 0;
+    const activeSessions = activeSessionsCount?.c || 0;
+    const globalRating = feedbackStats?.a ? parseFloat(feedbackStats.a).toFixed(2) : "0.00";
+    const completed = completedCount?.c || 0;
+    const total = totalAssignedCount?.c || 0;
     const completionRate = total > 0 ? ((completed / total) * 100).toFixed(1) : "0.0";
 
     res.json({
-      totalStudents, totalFaculty, activeSessions, globalRating, completionRate
+      totalStudents,
+      totalFaculty,
+      activeSessions,
+      globalRating,
+      completionRate
     });
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching global metrics:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -55,13 +58,51 @@ const getGlobalFaculties = async (req, res) => {
 
 const getGlobalStudents = async (req, res) => {
   try {
-    const rows = await db('global_students as s')
-      .join('department as d', 's.dept_id', 'd.dept_id')
+    const page = req.query.page ? parseInt(req.query.page, 10) : null;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    const sem = req.query.sem ? parseInt(req.query.sem, 10) : null;
+    const dept_id = req.query.dept_id ? String(req.query.dept_id).trim().toUpperCase() : null;
+    const search = req.query.search ? String(req.query.search).trim() : null;
+
+    let baseQuery = db('global_students as s')
+      .join('department as d', 's.dept_id', 'd.dept_id');
+
+    if (dept_id) baseQuery = baseQuery.where('s.dept_id', dept_id);
+    if (sem) baseQuery = baseQuery.where('s.sem', sem);
+    if (search) {
+      baseQuery = baseQuery.where(function() {
+        this.where('s.usn', 'like', `%${search}%`).orWhere('s.name', 'like', `%${search}%`);
+      });
+    }
+
+    if (page && limit) {
+      const offset = (page - 1) * limit;
+      const countRes = await baseQuery.clone().count('* as count').first();
+      const rows = await baseQuery
+        .clone()
+        .select('s.usn', 's.name', 's.sem', 's.section', 's.dept_id', 'd.dept_name')
+        .orderBy(['s.sem', 's.usn'])
+        .limit(limit)
+        .offset(offset);
+
+      return res.json({
+        data: rows,
+        pagination: {
+          total: countRes?.count || 0,
+          page,
+          limit,
+          totalPages: Math.ceil((countRes?.count || 0) / limit)
+        }
+      });
+    }
+
+    const rows = await baseQuery
       .select('s.usn', 's.name', 's.sem', 's.section', 's.dept_id', 'd.dept_name')
       .orderBy(['s.sem', 's.usn']);
+
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching global students:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -81,24 +122,33 @@ const getGlobalSessions = async (req, res) => {
 
 const getDepartmentSummaries = async (req, res) => {
   try {
-    const departments = await db('department').select('dept_id', 'dept_name', 'is_active');
-    
-    const summaries = await Promise.all(departments.map(async (d) => {
-      const dept_id = d.dept_id;
-      const sc = await db('global_students').where({ dept_id }).count('* as count').first();
-      const fc = await db('global_faculty').where({ dept_id }).count('* as count').first();
-      const as = await db('global_sessions').where({ dept_id, status: 'active' }).count('* as count').first();
-      const ar = await db('global_student_feedback').where({ dept_id }).avg('rating as avg_rating').first();
+    const [
+      departments,
+      studentCounts,
+      facultyCounts,
+      sessionCounts,
+      ratingStats
+    ] = await Promise.all([
+      db('department').select('dept_id', 'dept_name', 'is_active'),
+      db('global_students').select('dept_id').count('* as count').groupBy('dept_id'),
+      db('global_faculty').select('dept_id').count('* as count').groupBy('dept_id'),
+      db('global_sessions').where({ status: 'active' }).select('dept_id').count('* as count').groupBy('dept_id'),
+      db('global_student_feedback').select('dept_id').avg('rating as avg_rating').groupBy('dept_id')
+    ]);
 
-      return {
-        ...d,
-        student_count: sc.count || 0,
-        faculty_count: fc.count || 0,
-        active_sessions: as.count || 0,
-        avg_rating: ar.avg_rating || 0
-      };
+    const studentMap = Object.fromEntries(studentCounts.map(r => [r.dept_id, r.count]));
+    const facultyMap = Object.fromEntries(facultyCounts.map(r => [r.dept_id, r.count]));
+    const sessionMap = Object.fromEntries(sessionCounts.map(r => [r.dept_id, r.count]));
+    const ratingMap = Object.fromEntries(ratingStats.map(r => [r.dept_id, r.avg_rating]));
+
+    const summaries = departments.map((d) => ({
+      ...d,
+      student_count: studentMap[d.dept_id] || 0,
+      faculty_count: facultyMap[d.dept_id] || 0,
+      active_sessions: sessionMap[d.dept_id] || 0,
+      avg_rating: ratingMap[d.dept_id] ? parseFloat(ratingMap[d.dept_id]).toFixed(2) : 0
     }));
-    
+
     res.json(summaries);
   } catch (err) {
     console.error("Error fetching department summaries:", err);

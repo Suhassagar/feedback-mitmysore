@@ -45,8 +45,8 @@ function FacultyRegistrationModal({ closeModal }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000 }}>
-      <div className="card flex-col gap-md" style={{ width: "90%", maxWidth: "400px" }}>
+    <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000, padding: "16px" }}>
+      <div className="card flex-col gap-md" style={{ width: "100%", maxWidth: "400px", maxHeight: "90vh", overflowY: "auto", padding: "24px 20px" }}>
         {/* Centered heading */}
         <h2 className="title-medium text-gradient" style={{ textAlign: "center", margin: 0 }}>Faculty Registration</h2>
 

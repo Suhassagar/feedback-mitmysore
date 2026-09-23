@@ -56,7 +56,7 @@ export default function FacultySettings() {
         <p style={{ margin: 0, color: '#64748B', fontSize: '15px' }}>Manage your profile information and security credentials.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 270px), 1fr))', gap: '24px' }}>
         {settingsOptions.map(option => (
           <div 
             key={option.id}

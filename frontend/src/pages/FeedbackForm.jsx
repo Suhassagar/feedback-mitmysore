@@ -154,6 +154,9 @@ export default function FeedbackForm() {
         <style>
           {`
             @media (max-width: 600px) {
+              .feedback-container {
+                padding: 16px 12px !important;
+              }
               .feedback-glass-card {
                 padding: 16px 12px !important;
                 border-radius: 16px !important;
@@ -217,7 +220,7 @@ export default function FeedbackForm() {
           
           {/* FACULTY STEP */}
           {!isFinalStep && currentFaculty && (
-            <div className="card glass-modal feedback-glass-card" style={{ width: "100%", maxWidth: "800px", background: "#ffffff", borderRadius: "24px", padding: "var(--space-24)", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.05)" }}>
+            <div className="card feedback-glass-card" style={{ width: "100%", maxWidth: "800px", background: "#ffffff", borderRadius: "24px", padding: "var(--space-24)", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.05)" }}>
               <div className="flex-col gap-xl">
                 <div className="card feedback-inner-card" style={{ padding: "var(--space-24)", borderTop: "5px solid var(--navy)", animation: "fadeIn 0.4s" }}>
                   <div style={{ borderBottom: "1.5px solid #eee", paddingBottom: "15px", marginBottom: "24px" }}>

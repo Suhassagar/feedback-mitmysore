@@ -73,6 +73,26 @@ export default function DepartmentRemarks() {
     <PageTransition>
       <div style={{ animation: "fadeIn 0.3s ease-out" }}>
         
+        <style>
+          {`
+            @media (max-width: 600px) {
+              .remarks-summary-header {
+                padding: 20px 16px !important;
+              }
+              .remarks-summary-body {
+                padding: 20px 16px !important;
+              }
+              .remarks-scope-filter {
+                width: 100% !important;
+              }
+              .remarks-scope-filter select {
+                width: 100% !important;
+                flex: 1;
+              }
+            }
+          `}
+        </style>
+
         {/* Header Section */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "32px", padding: "10px 0" }}>
           <div>
@@ -90,7 +110,7 @@ export default function DepartmentRemarks() {
           </div>
 
           {/* Session Filter */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className="remarks-scope-filter" style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px" }}>
               <Filter size={16} /> Scope:
             </label>
@@ -110,7 +130,7 @@ export default function DepartmentRemarks() {
 
         {/* AI SUMMARY CARD */}
         <div className="card" style={{ marginBottom: "40px", border: "1px solid #E2E8F0", borderRadius: "20px", overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.03)" }}>
-          <div style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", padding: "24px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+          <div className="remarks-summary-header" style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)", padding: "24px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "16px", color: "white" }}>
               <div style={{ background: "rgba(255,255,255,0.15)", padding: "10px", borderRadius: "10px", backdropFilter: "blur(10px)" }}>
                 <Sparkles size={24} color="var(--gold)" />
@@ -135,7 +155,7 @@ export default function DepartmentRemarks() {
             )}
           </div>
 
-          <div style={{ padding: "40px 32px", background: "#fff" }}>
+          <div className="remarks-summary-body" style={{ padding: "40px 32px", background: "#fff" }}>
             {!aiSummary ? (
               <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
                  <div style={{ background: "#F8FAFC", padding: "20px", borderRadius: "50%" }}>

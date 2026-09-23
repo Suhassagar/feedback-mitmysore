@@ -135,7 +135,7 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-      <div style={{ background: "#fff", width: "90%", maxWidth: "700px", borderRadius: "16px", padding: "32px", boxShadow: "0 20px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "24px", maxHeight: "90vh" }}>
+      <div style={{ background: "#fff", width: "92%", maxWidth: "700px", borderRadius: "16px", padding: "clamp(16px, 4vw, 32px)", boxShadow: "0 20px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "20px", maxHeight: "90vh", overflowY: "auto" }}>
         
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

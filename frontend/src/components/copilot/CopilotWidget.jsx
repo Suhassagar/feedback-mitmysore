@@ -189,6 +189,25 @@ const CopilotWidget = () => {
         .markdown-content li { margin-bottom: 4px; }
         .markdown-content strong { color: #ffffff !important; font-weight: bold; }
         .markdown-content code { background: rgba(0,0,0,0.3) !important; padding: 2px 6px; border-radius: 4px; color: #93c5fd !important; }
+        
+        @media (max-width: 600px) {
+          .copilot-toggle-btn {
+            bottom: 20px !important;
+            right: 20px !important;
+            width: 56px !important;
+            height: 56px !important;
+          }
+          .copilot-window {
+            width: calc(100vw - 32px) !important;
+            max-width: calc(100vw - 32px) !important;
+            left: 16px !important;
+            right: 16px !important;
+            bottom: 86px !important;
+            height: 75vh !important;
+            max-height: 540px !important;
+            border-radius: 20px !important;
+          }
+        }
       `}</style>
       {/* Floating Toggle Button */}
       <button

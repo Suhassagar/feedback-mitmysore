@@ -105,7 +105,7 @@ export default function AdminLayout() {
             
             <div className="header-profile" style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "5px 10px", borderRadius: "8px", transition: "background 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#F3F4F6"} onMouseOut={(e) => e.currentTarget.style.background = "transparent"}>
               <img src={`https://ui-avatars.com/api/?name=Admin&background=2563EB&color=fff`} alt="Profile" style={{ width: "36px", height: "36px", borderRadius: "50%" }} />
-              <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="header-profile-info" style={{ display: "flex", flexDirection: "column" }}>
                 <span style={{ fontSize: "14px", fontWeight: "600", color: "var(--navy)" }}>Dr. Principal</span>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Principal</span>
               </div>
@@ -115,7 +115,7 @@ export default function AdminLayout() {
         </header>
 
         {/* ================= MAIN DYNAMIC CONTENT ================= */}
-        <main className="dashboard-main" style={{ background: "#F8FAFC", padding: "30px", overflowY: "auto", height: "calc(100vh - 70px)" }}>
+        <main className="dashboard-main" style={{ background: "#F8FAFC", padding: "clamp(16px, 3vw, 30px)", overflowY: "auto", height: "calc(100vh - 70px)" }}>
           <Outlet />
         </main>
       </div>
