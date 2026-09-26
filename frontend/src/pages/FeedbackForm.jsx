@@ -17,6 +17,7 @@ export default function FeedbackForm() {
   const [groupedQuestions, setGroupedQuestions] = useState({});
   const [orderedSections, setOrderedSections] = useState([]);
   const [feedbackData, setFeedbackData] = useState({});
+  const [facultyRemarks, setFacultyRemarks] = useState({});
   const [departmentRemark, setDepartmentRemark] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(null);
   
@@ -74,6 +75,13 @@ export default function FeedbackForm() {
     }));
   };
 
+  const handleFacultyRemarkChange = (facultyIndex, value) => {
+    setFacultyRemarks((prev) => ({
+      ...prev,
+      [facultyIndex]: value,
+    }));
+  };
+
   const validateCurrentStep = () => {
     if (currentStep >= facultyList.length) return true; // Remarks step is always valid (optional)
 
@@ -114,6 +122,7 @@ export default function FeedbackForm() {
         faculty_id: faculty.faculty_id,
         course_id: faculty.course_id,
         feedback: feedbackData[fIndex],
+        remark: facultyRemarks[fIndex] || "",
       }));
 
       await apiClient.post(
@@ -285,6 +294,25 @@ export default function FeedbackForm() {
                   </div>
                 ))}
               </div>
+
+              {/* Faculty Remarks Textarea */}
+              <div style={{ marginTop: "24px", background: "#FAFCFF", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "16px 20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                   <label style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "0.95rem" }}>
+                     Remarks for {currentFaculty.faculty_name} <span style={{ color: "var(--slate)", fontWeight: "normal", fontSize: "0.85rem" }}>(Optional)</span>
+                   </label>
+                   <span style={{ fontSize: "0.75rem", background: "#E2E8F0", color: "var(--slate)", padding: "2px 8px", borderRadius: "12px", fontWeight: "600" }}>100% Anonymous</span>
+                </div>
+                <textarea 
+                  className="form-input"
+                  placeholder={`Share constructive feedback for ${currentFaculty.faculty_name}...`}
+                  rows={3}
+                  value={facultyRemarks[currentStep] || ""}
+                  onChange={(e) => handleFacultyRemarkChange(currentStep, e.target.value)}
+                  style={{ width: "100%", padding: "12px", resize: "vertical", borderRadius: "8px", border: "1px solid #CBD5E1" }}
+                />
+              </div>
+
             </div>
           </div>
         )}

@@ -123,6 +123,17 @@ const submitFeedback = async (req, res) => {
           dept_id
         });
       }
+
+      // Save faculty-specific remark if provided
+      if (faculty.remark && faculty.remark.trim() !== "") {
+        await trx('global_faculty_remarks').insert({
+          session_id,
+          dept_id,
+          faculty_id: faculty.faculty_id,
+          course_id: faculty.course_id,
+          remark_text: faculty.remark.trim()
+        });
+      }
     }
 
     // Mark feedback as done for this student

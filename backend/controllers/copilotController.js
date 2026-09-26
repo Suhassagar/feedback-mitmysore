@@ -254,7 +254,7 @@ const setupCopilotSocket = (io) => {
         const facultyList = await db('global_faculty').where({ dept_id }).select('name', 'faculty_id');
         const facultyContext = facultyList.map(f => `${f.name} (ID: ${f.faculty_id})`).join(', ');
 
-        const contextMsg = `SYSTEM CONTEXT: I am currently logged in to department ${dept_id}. There are ${pendingFacultyCount.count} pending faculty and ${activeSessionsCount.count} active sessions. 
+        const contextMsg = `SYSTEM CONTEXT: I am currently logged in to department ${deptExists.dept_name} (${dept_id}). There are ${pendingFacultyCount.count} pending faculty and ${activeSessionsCount.count} active sessions. 
 The faculty in this department are: ${facultyContext || 'None currently'}.
 Give an extremely short, professional greeting starting with '${greeting}'. Limit to exactly 1 sentence. Do not list any statistics or pending tasks in the greeting. Simply say hello and ask how you can assist the department today.`;
         
