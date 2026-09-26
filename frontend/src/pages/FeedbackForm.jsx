@@ -4,6 +4,7 @@ import apiClient from "../services/apiClient";
 import { toast } from "react-hot-toast";
 import { ChevronRight, ChevronLeft, Send, MessageSquare } from "lucide-react";
 import PageTransition from "../components/PageTransition";
+import { jumbleQuestionsForStudent } from "../utils/shuffleUtils";
 
 export default function FeedbackForm() {
   const location = useLocation();
@@ -14,6 +15,7 @@ export default function FeedbackForm() {
   const [facultyList, setFacultyList] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [groupedQuestions, setGroupedQuestions] = useState({});
+  const [orderedSections, setOrderedSections] = useState([]);
   const [feedbackData, setFeedbackData] = useState({});
   const [departmentRemark, setDepartmentRemark] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(null);
@@ -40,14 +42,18 @@ export default function FeedbackForm() {
         const qRes = await apiClient.get(`/student/questions/${session_id}`);
         setQuestions(qRes.data);
         
-        // Group questions by heading
-        const grouped = {};
-        qRes.data.forEach(q => {
-          const heading = q.question_heading || "General Feedback";
-          if (!grouped[heading]) grouped[heading] = [];
-          grouped[heading].push(q);
-        });
-        setGroupedQuestions(grouped);
+        // Deterministic per-student seed: USN + session_id or persistent session token
+        const studentUsn = location.state?.usn || sessionStorage.getItem('student_usn') || '';
+        let studentSeed = sessionStorage.getItem('feedback_student_seed');
+        if (!studentSeed) {
+          studentSeed = `${studentUsn}_${session_id}_${tokenRes.data.token || Date.now()}`;
+          sessionStorage.setItem('feedback_student_seed', studentSeed);
+        }
+
+        // Jumble sections and questions uniquely for this student
+        const { groupedQuestions: jumbledGrouped, orderedSections: jumbledSections } = jumbleQuestionsForStudent(qRes.data, studentSeed);
+        setGroupedQuestions(jumbledGrouped);
+        setOrderedSections(jumbledSections);
         
         setLoading(false);
       } catch {
@@ -122,6 +128,8 @@ export default function FeedbackForm() {
       );
 
       sessionStorage.removeItem('active_feedback_session_id');
+      sessionStorage.removeItem('student_usn');
+      sessionStorage.removeItem('feedback_student_seed');
       try {
         await apiClient.post('/auth/logout');
       } catch (logoutErr) {
@@ -234,7 +242,7 @@ export default function FeedbackForm() {
                 </div>
 
               <div className="flex-col gap-lg">
-                {Object.entries(groupedQuestions).map(([heading, headingQuestions], hIndex) => (
+                {(orderedSections.length > 0 ? orderedSections : Object.entries(groupedQuestions).map(([heading, questions]) => ({ heading, questions }))).map(({ heading, questions: headingQuestions }, hIndex) => (
                   <div key={heading} style={{ background: "#FAFCFF", border: "1px solid #E2E8F0", borderRadius: "12px", overflow: "hidden" }}>
                     
                     <div style={{ background: "var(--navy)", padding: "12px 20px" }}>

@@ -25,7 +25,9 @@ export default function StudentLogin() {
         { withCredentials: true }
       );
 
-      navigate("/feedback", { state: { session_id: cleanSessionId } });
+      sessionStorage.removeItem('feedback_student_seed');
+      sessionStorage.setItem('student_usn', cleanUsn);
+      navigate("/feedback", { state: { session_id: cleanSessionId, usn: cleanUsn } });
     } catch (err) {
       if (err.response) {
         setError(err.response.data.message);
