@@ -46,94 +46,24 @@ function decrypt(text) {
 }
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind a load balancer/reverse proxy)
 app.use(helmet());
+
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://mitmysore.vercel.app",
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 const isOriginAllowed = (origin) => {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
-  if (origin.endsWith(".vercel.app")) return true;
+  // Strictly allow only verified MIT Mysore deployment subdomains, not arbitrary *.vercel.app
+  if (/^https:\/\/mitmysore(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)) return true;
+  if (/^https:\/\/feedback-mitmysore(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)) return true;
   return false;
 };
-
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: (origin, callback) => {
-      if (isOriginAllowed(origin)) {
-        return callback(null, true);
-      }
-      return callback(null, false);
-    },
-    methods: ["POST", "GET", "PUT", "DELETE", "PATCH"],
-    credentials: true,
-  }
-});
-
-// --- Security: Rate Limiting ---
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login requests per windowMs
-  message: { success: false, message: "Too many login attempts from this IP, please try again after 15 minutes." }
-});
-
-// Global State Trackers
-const activeTabs = {}; 
-const disconnectTimeouts = {};
-
-setupCopilotSocket(io);
-
-io.on("connection", (socket) => {
-  console.log("WebSocket client connected:", socket.id);
-
-  socket.on("register_dashboard", (data) => {
-    const dept_id = data.dept_id;
-    if (!dept_id) return;
-    
-    socket.dept_id = dept_id;
-    activeTabs[dept_id] = (activeTabs[dept_id] || 0) + 1;
-    
-    if (disconnectTimeouts[dept_id]) {
-      clearTimeout(disconnectTimeouts[dept_id]);
-      delete disconnectTimeouts[dept_id];
-      console.log(`[AUTH] Disconnect timer canceled for ${dept_id} (Reconnected)`);
-    }
-  });
-
-  socket.on("disconnect", () => {
-    const dept_id = socket.dept_id;
-    if (dept_id) {
-      activeTabs[dept_id] = Math.max(0, activeTabs[dept_id] - 1);
-      
-      if (activeTabs[dept_id] === 0) {
-        // [DEVELOPMENT MODE] Disabled 3-second lockdown timer to prevent annoyances during hot-reloads
-        console.log(`[AUTH] Tab count for ${dept_id} is 0. (Logout timer disabled for development)`);
-        
-        /* 
-        disconnectTimeouts[dept_id] = setTimeout(async () => {
-           console.log(`[AUTH] 3 seconds expired. Logging out ${dept_id}.`);
-           
-           const dummyReq = {
-             headers: socket.request.headers || {},
-             socket: { remoteAddress: socket.request.connection?.remoteAddress },
-             ip: socket.request.connection?.remoteAddress
-           };
-
-           if (typeof logActivity === 'function') {
-               await logActivity(dummyReq, dept_id, 'LOGOUT', 'AUTH', 'Logged out (Browser Closed/Disconnected)');
-           }
-           
-        }, 3000); 
-        */
-      }
-    }
-    console.log("WebSocket client disconnected:", socket.id);
-  });
-});
 
 // --- CORS setup ---
 app.use(
@@ -185,8 +115,6 @@ app.get("/health/email", async (req, res) => {
 });
 
 // --- Session setup ---
-app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind a load balancer/reverse proxy)
-
 const sessionPool = mysql.createPool({
   host: process.env.DB_HOST || "127.0.0.1",
   user: process.env.DB_USER || "root",
@@ -214,24 +142,94 @@ const sessionStore = new MySQLStore({
   }
 }, sessionPool);
 
-app.use(
-  session({
-    key: 'connect.sid',
-    secret: env.SESSION_SECRET,
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: { 
-      secure: env.NODE_ENV === "production", 
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax"
+const sessionMiddleware = session({
+  key: 'connect.sid',
+  secret: env.SESSION_SECRET,
+  store: sessionStore,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: env.NODE_ENV === "production", 
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax"
+  },
+});
+
+app.use(sessionMiddleware);
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
     },
-  })
-);
+    methods: ["POST", "GET", "PUT", "DELETE", "PATCH"],
+    credentials: true,
+  }
+});
+
+app.set('io', io);
+
+// Bind express-session with Socket.IO so socket.request.session is populated
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next);
+});
+
+// Global State Trackers
+const activeTabs = {}; 
+const disconnectTimeouts = {};
+
+setupCopilotSocket(io);
+
+io.on("connection", (socket) => {
+  const session = socket.request?.session;
+  console.log("WebSocket client connected:", socket.id, "Session user:", session?.username || session?.usn || "anonymous");
+
+  socket.on("register_dashboard", (data) => {
+    const session = socket.request?.session;
+    if (!session || !session.role) {
+      console.warn(`[SOCKET] Blocked unauthenticated register_dashboard from ${socket.id}`);
+      return;
+    }
+
+    let dept_id = data?.dept_id;
+    if (session.role === 'department') {
+      dept_id = session.dept_id;
+    } else if (session.role !== 'admin') {
+      console.warn(`[SOCKET] Unauthorized role ${session.role} attempted register_dashboard`);
+      return;
+    }
+
+    if (!dept_id) return;
+    
+    socket.dept_id = dept_id;
+    activeTabs[dept_id] = (activeTabs[dept_id] || 0) + 1;
+    
+    if (disconnectTimeouts[dept_id]) {
+      clearTimeout(disconnectTimeouts[dept_id]);
+      delete disconnectTimeouts[dept_id];
+      console.log(`[AUTH] Disconnect timer canceled for ${dept_id} (Reconnected)`);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    const dept_id = socket.dept_id;
+    if (dept_id) {
+      activeTabs[dept_id] = Math.max(0, activeTabs[dept_id] - 1);
+    }
+    console.log("WebSocket client disconnected:", socket.id);
+  });
+});
 
 // --- Basic route ---
 app.get("/", (req, res) => res.send("Server is running!"));
 
 // --- Routes (Knex Refactored) ---
+const { apiLimiter } = require('./middleware/rateLimiter');
+app.use(apiLimiter); // Apply general rate limit to all API routes
+
 app.use('/auth', require('./routes/authRoutes'));
 app.use('/faculty', require('./routes/facultyRoutes'));
 app.use('/', require('./routes/studentRoutes'));

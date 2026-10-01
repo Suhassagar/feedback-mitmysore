@@ -143,6 +143,7 @@ CREATE TABLE `global_student_feedback` (
   `question_id` int(11) DEFAULT NULL,
   `rating` tinyint(4) DEFAULT NULL,
   `session_id` varchar(50) NOT NULL,
+  `is_genuine` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_analytics` (`session_id`,`faculty_id`,`course_id`,`rating`),
@@ -169,6 +170,36 @@ CREATE TABLE `global_session_remarks` (
   KEY `fk_rem_session` (`session_id`,`dept_id`),
   CONSTRAINT `fk_rem_session` FOREIGN KEY (`session_id`, `dept_id`) REFERENCES `global_sessions` (`session_id`, `dept_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS global_faculty_remarks;
+CREATE TABLE `global_faculty_remarks` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `session_id` varchar(50) NOT NULL,
+  `dept_id` varchar(50) NOT NULL,
+  `faculty_id` varchar(50) NOT NULL,
+  `course_id` varchar(50) NOT NULL,
+  `remark_text` text NOT NULL,
+  `sentiment_score` decimal(5,2) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_fac_remarks_session` (`session_id`,`dept_id`),
+  KEY `idx_fac_remarks_faculty` (`faculty_id`,`course_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS global_section_remarks;
+CREATE TABLE `global_section_remarks` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `session_id` varchar(50) NOT NULL,
+  `dept_id` varchar(50) NOT NULL,
+  `faculty_id` varchar(50) NOT NULL,
+  `course_id` varchar(50) NOT NULL,
+  `section_heading` varchar(255) NOT NULL,
+  `remark_text` text NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_section_remarks_lookup` (`faculty_id`,`course_id`,`section_heading`),
+  KEY `idx_section_remarks_session` (`session_id`,`dept_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 DROP TABLE IF EXISTS global_faculty_notes;
 CREATE TABLE `global_faculty_notes` (

@@ -219,8 +219,17 @@ const setupCopilotSocket = (io) => {
     let messages = []; // Track conversation history
 
     socket.on("init_copilot", async (data) => {
-      const dept_id = socket.dept_id || data?.dept_id;
+      const session = socket.request?.session;
+      if (!session || (session.role !== 'department' && session.role !== 'admin')) {
+        socket.emit("copilot_stream", { text: "⚠️ Unauthorized: Active department or admin session required." });
+        socket.emit("copilot_stream_end");
+        return;
+      }
+
+      // Enforce dept_id from authenticated session for department role
+      const dept_id = session.role === 'department' ? session.dept_id : (data?.dept_id || socket.dept_id || session.dept_id);
       if (!dept_id) return;
+      socket.dept_id = dept_id;
 
       const deptExists = await db('department').where({ dept_id, is_active: true }).first();
       if (!deptExists) {
@@ -285,6 +294,13 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
     });
 
     socket.on("copilot_message", async (data) => {
+      const session = socket.request?.session;
+      if (!session || (session.role !== 'department' && session.role !== 'admin')) {
+        socket.emit("copilot_stream", { text: "⚠️ Unauthorized: Active department or admin session required." });
+        socket.emit("copilot_stream_end");
+        return;
+      }
+
       if (!messages || messages.length === 0) return;
       
       let userMessageContent = data.message;
@@ -636,8 +652,20 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
 
     // Execute Confirmed Actions directly from UI bypass LLM
     socket.on("execute_copilot_action", async (data) => {
+      const session = socket.request?.session;
+      if (!session || (session.role !== 'department' && session.role !== 'admin')) {
+        socket.emit("copilot_stream", { text: "⚠️ Unauthorized: Active department or admin session required." });
+        socket.emit("copilot_stream_end");
+        return;
+      }
+
       const { action, args } = data;
-      const dept_id = socket.dept_id;
+      const dept_id = session.role === 'department' ? session.dept_id : (socket.dept_id || args?.dept_id);
+      if (!dept_id) {
+        socket.emit("copilot_stream", { text: "❌ Department context missing." });
+        socket.emit("copilot_stream_end");
+        return;
+      }
       
       try {
         if (action === 'create_session') {
@@ -645,7 +673,7 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
           let responseData;
           const reqMock = { 
             body: { session_id: `S${Date.now().toString().substring(5)}`, dept_id, sem, section },
-            session: { role: 'department', dept_id }
+            session: { role: session.role, dept_id, username: session.username }
           };
           const resMock = {
             json: (resData) => { responseData = { success: true, data: resData }; },
@@ -681,12 +709,14 @@ Give an extremely short, professional greeting starting with '${greeting}'. Limi
               dept_id: pending.dept_id,
               password: defaultPassword
             });
-            await trx('global_directory').insert({
-              email: pending.email,
-              password: defaultPassword,
-              role: 'faculty',
-              faculty_id: pending.faculty_id
-            });
+            await trx('global_directory')
+              .insert({
+                user_id: pending.email,
+                role: 'faculty',
+                dept_id: pending.dept_id
+              })
+              .onConflict('user_id')
+              .ignore();
             await trx('global_pending_faculty_registrations').where({ id: pending.id }).del();
             await trx.commit();
             socket.emit("copilot_stream", { text: `✅ Successfully approved ${pending.name}. Their account is now active.` });

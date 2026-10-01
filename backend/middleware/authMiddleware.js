@@ -85,6 +85,10 @@ const isAdminOrDepartmentOrFaculty = (req, res, next) => {
     if (targetFaculty && req.session.faculty_id && req.session.faculty_id.toUpperCase() !== targetFaculty.toUpperCase()) {
       return res.status(403).json({ error: "Forbidden: Cannot access other faculty data" });
     }
+    const targetDept = req.params.dept_id || req.query.dept || req.query.dept_id || req.body?.dept_id;
+    if (targetDept && req.session.dept_id && req.session.dept_id.toUpperCase() !== targetDept.toUpperCase()) {
+      return res.status(403).json({ error: "Forbidden: Cross-department access strictly prohibited" });
+    }
     return next();
   }
   return res.status(403).json({ error: "Forbidden: Admin, Department, or Faculty access required" });

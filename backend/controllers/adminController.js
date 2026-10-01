@@ -286,6 +286,7 @@ const purgeDepartmentData = async (req, res) => {
       await trx('global_directory').where({ dept_id }).del();
       await trx('global_department_activity_logs').where({ dept_id }).del();
       await trx('global_session_remarks').where({ dept_id }).del();
+      await trx('global_faculty_remarks').where({ dept_id }).del().catch(() => {});
       await trx('global_course').where({ dept_id }).del();
       await trx('global_pending_faculty_registrations').where({ dept_id }).del();
       await trx('department').where({ dept_id }).del();
@@ -293,6 +294,7 @@ const purgeDepartmentData = async (req, res) => {
       if (purgeSessions) {
         await trx('global_student_feedback').where({ dept_id }).del();
         await trx('global_session_remarks').where({ dept_id }).del();
+        await trx('global_faculty_remarks').where({ dept_id }).del().catch(() => {});
         await trx('global_sessions').where({ dept_id }).del();
         await trx('global_students').where({ dept_id }).update({ session_id: null, feedback_given: 'missing' });
       }

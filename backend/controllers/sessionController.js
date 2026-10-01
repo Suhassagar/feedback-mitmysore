@@ -147,6 +147,7 @@ const deleteSession = async (req, res) => {
     // Clean up orphaned records to maintain data integrity
     await trx('global_student_feedback').where({ session_id, dept_id: actualDeptId }).del();
     await trx('global_session_remarks').where({ session_id, dept_id: actualDeptId }).del();
+    await trx('global_faculty_remarks').where({ session_id, dept_id: actualDeptId }).del().catch(() => {});
     await trx('global_students').where({ session_id, dept_id: actualDeptId }).update({ session_id: null, feedback_given: 'missing' });
     await trx('global_sessions').where({ session_id, dept_id: actualDeptId }).del();
     

@@ -110,6 +110,15 @@ const approveFaculty = async (req, res) => {
     }
 
     const { id: pending_id, faculty_id, name, email, dept_id } = pendingRows[0];
+
+    // Authorization: Department users can only approve registrations for their own department
+    if (req.session.role === 'department') {
+      if (!req.session.dept_id || req.session.dept_id.toUpperCase() !== dept_id.toUpperCase()) {
+        await trx.rollback();
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot approve faculty for another department" });
+      }
+    }
+
     const defaultPassword = await bcrypt.hash("Fac@2007", 10);
 
     await trx('global_faculty').insert({
@@ -142,10 +151,19 @@ const rejectFaculty = async (req, res) => {
 
   try {
     const query = id ? { id } : { faculty_id };
-    const deletedCount = await db('global_pending_faculty_registrations').where(query).del();
-    if (deletedCount === 0) {
+    const pending = await db('global_pending_faculty_registrations').where(query).first();
+    if (!pending) {
       return res.status(404).json({ success: false, message: "Registration not found" });
     }
+
+    // Authorization: Department users can only reject registrations for their own department
+    if (req.session.role === 'department') {
+      if (!req.session.dept_id || req.session.dept_id.toUpperCase() !== pending.dept_id.toUpperCase()) {
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot reject faculty for another department" });
+      }
+    }
+
+    await db('global_pending_faculty_registrations').where({ id: pending.id }).del();
     res.json({ success: true, message: "Registration rejected." });
   } catch (err) {
     console.error("Error rejecting faculty:", err);

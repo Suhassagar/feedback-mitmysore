@@ -122,7 +122,8 @@ export default function FacultyProfile({
       const formattedData = res.data.map(item => ({
         name: `Q${item.question_id}`,
         rating: parseFloat(item.avg_rating),
-        question_text: item.question_text
+        question_text: item.question_text,
+        question_heading: item.question_heading || "General Feedback"
       }));
       setGraphData(formattedData);
     } catch (err) {

@@ -38,11 +38,50 @@ db.schema.hasTable('global_used_tokens').then(exists => {
   }
 }).catch(e => console.error('Auto-migration warning:', e.message));
 
+db.schema.hasTable('global_faculty_remarks').then(exists => {
+  if (!exists) {
+    return db.schema.createTable('global_faculty_remarks', table => {
+      table.increments('id').primary();
+      table.string('session_id', 50).notNullable();
+      table.string('dept_id', 50).notNullable();
+      table.string('faculty_id', 50).notNullable();
+      table.string('course_id', 50).notNullable();
+      table.text('remark_text').notNullable();
+      table.decimal('sentiment_score', 5, 2).nullable();
+      table.timestamp('created_at').defaultTo(db.fn.now());
+      table.index(['session_id', 'dept_id'], 'idx_fac_remarks_session');
+      table.index(['faculty_id', 'course_id'], 'idx_fac_remarks_faculty');
+    }).then(() => console.log('✅ Created missing global_faculty_remarks table in database'));
+  }
+}).catch(e => console.error('Auto-migration warning (global_faculty_remarks):', e.message));
+
 // Self-healing: Ensure performance composite indexes exist on boot
+db.schema.hasTable('global_section_remarks').then(exists => {
+  if (!exists) {
+    return db.schema.createTable('global_section_remarks', table => {
+      table.increments('id').primary();
+      table.string('session_id', 50).notNullable();
+      table.string('dept_id', 50).notNullable();
+      table.string('faculty_id', 50).notNullable();
+      table.string('course_id', 50).notNullable();
+      table.string('section_heading', 255).notNullable();
+      table.text('remark_text').notNullable();
+      table.timestamp('created_at').defaultTo(db.fn.now());
+      table.index(['faculty_id', 'course_id', 'section_heading'], 'idx_section_remarks_lookup');
+      table.index(['session_id', 'dept_id'], 'idx_section_remarks_session');
+    }).then(() => console.log('✅ Created missing global_section_remarks table in database'));
+  }
+}).catch(e => console.error('Auto-migration warning (global_section_remarks):', e.message));
 async function ensurePerformanceIndexes() {
   try {
     const feedbackExists = await db.schema.hasTable('global_student_feedback');
     if (feedbackExists) {
+      await db.schema.hasColumn('global_student_feedback', 'is_genuine').then(async exists => {
+        if (!exists) {
+          await db.schema.table('global_student_feedback', t => t.boolean('is_genuine').defaultTo(true));
+          console.log('✅ Added missing is_genuine column for variance shadowbanning');
+        }
+      });
       await db.raw('ALTER TABLE global_student_feedback ADD INDEX idx_feedback_session_dept (session_id, dept_id)').catch(err => {
         if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
           // Ignored if index already exists

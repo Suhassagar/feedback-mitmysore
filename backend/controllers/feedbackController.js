@@ -42,6 +42,14 @@ const getStudentSubjects = async (req, res) => {
         'a.sem'
       );
 
+    // Start the timer for this student session
+    if (req.session) {
+      // Don't overwrite if they just refreshed the page
+      if (!req.session.feedback_start_time) {
+        req.session.feedback_start_time = Date.now();
+      }
+    }
+
     res.json(result);
   } catch (err) {
     console.error("Error fetching subjects:", err);
@@ -67,6 +75,21 @@ const submitFeedback = async (req, res) => {
   
   const student = { usn, session_id: student_session_id, dept_id };
   
+  // Enforce 5-minute minimum dwell time
+  // MIN_TIME in milliseconds (5 minutes = 5 * 60 * 1000)
+  const MIN_TIME = 5 * 60 * 1000; 
+  if (req.session.feedback_start_time) {
+    const timeSpent = Date.now() - req.session.feedback_start_time;
+    if (timeSpent < MIN_TIME) {
+      const remainingSecs = Math.ceil((MIN_TIME - timeSpent) / 1000);
+      return res.status(400).json({ error: `Please take time to read and evaluate. You can submit in ${remainingSecs} seconds.` });
+    }
+  } else {
+    // If somehow start time is missing, set it now and force them to wait
+    req.session.feedback_start_time = Date.now();
+    return res.status(400).json({ error: `Session timer restarted. Please review the feedback for 5 minutes before submitting.` });
+  }
+
   const trx = await db.transaction();
   try {
     // IDEMPOTENCY CHECK: Try to insert the token. If it already exists, it throws ER_DUP_ENTRY and aborts immediately.
@@ -96,13 +119,40 @@ const submitFeedback = async (req, res) => {
       throw new Error("Feedback already submitted");
     }
 
-    // Store feedback anonymously (no USN)
+    // Shadowban Variance Check
+    const allRatings = [];
+    for (const faculty of facultyList) {
+      if (faculty.feedback) {
+        Object.values(faculty.feedback).forEach(rating => {
+          if (rating != null) allRatings.push(Number(rating));
+        });
+      }
+    }
+    
+    let isGenuine = true;
+    if (allRatings.length > 0) {
+      const mean = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
+      const variance = allRatings.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allRatings.length;
+      if (variance === 0) {
+        isGenuine = false; // Flag as straight-lined (shadowban)
+      }
+    }
+
+    // =========================================================================
+    // ENHANCEMENT: High-Performance Bulk Insertion & In-Memory Staging
+    // =========================================================================
+    const ratingsToInsert = [];
+    const facultyRemarksToInsert = [];
+    const sectionRemarksToInsert = [];
+
+    // Phase 1: Fast in-memory validation and staging (0 DB queries)
     for (let i = 0; i < facultyList.length; i++) {
       const faculty = facultyList[i];
-      if (!faculty.faculty_id || !faculty.course_id) 
+      if (!faculty.faculty_id || !faculty.course_id) {
         throw new Error("Invalid faculty data");
+      }
 
-      const feedback = faculty.feedback; // object {question_id: rating, ...}
+      const feedback = faculty.feedback || {};
       const questionIds = Object.keys(feedback);
       
       if (questionIds.length === 0) {
@@ -110,23 +160,28 @@ const submitFeedback = async (req, res) => {
       }
 
       for (let qId of questionIds) {
-        const rating = feedback[qId];
-        if (rating == null) 
-          throw new Error(`Missing rating for question ${qId}`);
+        const rawRating = feedback[qId];
+        const rating = Number(rawRating);
 
-        await trx('global_student_feedback').insert({
+        // Fail-Fast: Strict integer validation (1 to 5)
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+          throw new Error(`Invalid rating for question ${qId}. Must be between 1 and 5.`);
+        }
+
+        ratingsToInsert.push({
           faculty_id: faculty.faculty_id,
           course_id: faculty.course_id,
           question_id: qId,
           rating,
           session_id,
-          dept_id
+          dept_id,
+          is_genuine: isGenuine
         });
       }
 
-      // Save faculty-specific remark if provided
-      if (faculty.remark && faculty.remark.trim() !== "") {
-        await trx('global_faculty_remarks').insert({
+      // Stage faculty-specific remark if provided
+      if (faculty.remark && typeof faculty.remark === 'string' && faculty.remark.trim() !== "") {
+        facultyRemarksToInsert.push({
           session_id,
           dept_id,
           faculty_id: faculty.faculty_id,
@@ -134,6 +189,35 @@ const submitFeedback = async (req, res) => {
           remark_text: faculty.remark.trim()
         });
       }
+
+      // Stage section-specific remarks if provided
+      if (faculty.section_remarks && typeof faculty.section_remarks === 'object') {
+        for (const [section_heading, remark_text] of Object.entries(faculty.section_remarks)) {
+          if (remark_text && typeof remark_text === 'string' && remark_text.trim() !== "") {
+            sectionRemarksToInsert.push({
+              session_id,
+              dept_id,
+              faculty_id: faculty.faculty_id,
+              course_id: faculty.course_id,
+              section_heading,
+              remark_text: remark_text.trim()
+            });
+          }
+        }
+      }
+    }
+
+    // Phase 2: Vector Bulk Insert (Safe batching and empty payload checks)
+    if (ratingsToInsert.length > 0) {
+      await trx.batchInsert('global_student_feedback', ratingsToInsert, 100);
+    }
+
+    if (facultyRemarksToInsert.length > 0) {
+      await trx('global_faculty_remarks').insert(facultyRemarksToInsert);
+    }
+
+    if (sectionRemarksToInsert.length > 0) {
+      await trx('global_section_remarks').insert(sectionRemarksToInsert);
     }
 
     // Mark feedback as done for this student
@@ -156,7 +240,10 @@ const submitFeedback = async (req, res) => {
     
     // In actual production, emit socket event here. Assuming we can get io from somewhere, 
     // or just let the socket logic handle it via a global app variable if needed.
-    // req.app.get('io').emit("NEW_FEEDBACK_RECEIVED", { dept_id });
+    const io = req.app.get('io');
+    if (io) {
+      io.emit("NEW_FEEDBACK_RECEIVED", { dept_id });
+    }
 
     res.json({ message: "Feedback submitted successfully" });
   } catch (err) {
@@ -291,7 +378,7 @@ const getSubjectsWithAvg = async (req, res) => {
 
   try {
     const rows = await db('global_student_feedback')
-      .where({ faculty_id, dept_id })
+      .where({ faculty_id, dept_id, is_genuine: true })
       .select('course_id')
       .avg('rating as avg_rating')
       .groupBy('course_id');
@@ -307,10 +394,10 @@ const getQuestionsAvg = async (req, res) => {
   try {
     const rows = await db('global_student_feedback as f')
       .join('global_feedback_questions as q', 'f.question_id', 'q.question_id')
-      .where({ 'f.faculty_id': faculty_id, 'f.course_id': course_id, 'f.dept_id': dept_id })
-      .select('f.question_id', 'q.question_text')
+      .where({ 'f.faculty_id': faculty_id, 'f.course_id': course_id, 'f.dept_id': dept_id, 'f.is_genuine': true })
+      .select('f.question_id', 'q.question_text', 'q.question_heading')
       .avg('f.rating as avg_rating')
-      .groupBy('f.question_id', 'q.question_text')
+      .groupBy('f.question_id', 'q.question_text', 'q.question_heading')
       .orderBy('f.question_id');
     res.json(rows);
   } catch (err) {

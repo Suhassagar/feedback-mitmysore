@@ -6,6 +6,7 @@ const getDepartmentAnalytics = async (req, res) => {
     const avgResult = await db('global_student_feedback')
       .join('global_sessions', 'global_student_feedback.session_id', 'global_sessions.session_id')
       .where('global_student_feedback.dept_id', dept_id)
+      .andWhere('global_student_feedback.is_genuine', true)
       .avg('rating as avg_rating')
       .first();
 
@@ -22,6 +23,7 @@ const getDepartmentAnalytics = async (req, res) => {
     const trendRows = await db('global_student_feedback as sf')
       .join('global_sessions as s', 'sf.session_id', 's.session_id')
       .where('sf.dept_id', dept_id)
+      .andWhere('sf.is_genuine', true)
       .andWhere('sf.created_at', '>=', db.raw('DATE_SUB(CURDATE(), INTERVAL 6 DAY)'))
       .select(
         db.raw("DATE_FORMAT(sf.created_at, '%a') as name"),
@@ -67,7 +69,7 @@ const getFacultyAnalytics = async (req, res) => {
     // 1. Overall Stats
     const stats = await db('global_student_feedback as sf')
       .leftJoin('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id })
+      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
       .andWhere(filterClause)
       .select(
         db.raw('AVG(sf.rating) as avg_rating'),
@@ -78,7 +80,7 @@ const getFacultyAnalytics = async (req, res) => {
     // 2. Rating Distribution
     const distribution = await db('global_student_feedback as sf')
       .leftJoin('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id })
+      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
       .andWhere(filterClause)
       .select(
         db.raw('SUM(CASE WHEN sf.rating >= 4.5 THEN 1 ELSE 0 END) as excellent'),
@@ -91,7 +93,7 @@ const getFacultyAnalytics = async (req, res) => {
     // 3. Trend Data
     const trendData = await db('global_student_feedback as sf')
       .join('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id })
+      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
       .andWhere(filterClause)
       .select('s.sem', db.raw('AVG(sf.rating) as avg_rating'))
       .groupBy('s.sem')
@@ -101,7 +103,7 @@ const getFacultyAnalytics = async (req, res) => {
     const radarData = await db('global_student_feedback as sf')
       .join('global_feedback_questions as q', 'sf.question_id', 'q.question_id')
       .leftJoin('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id })
+      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
       .andWhere(filterClause)
       .select('q.question_text as question', db.raw('AVG(sf.rating) as avg_rating'))
       .groupBy('sf.question_id', 'q.question_text');
@@ -111,7 +113,7 @@ const getFacultyAnalytics = async (req, res) => {
       .join('global_course as c', function() {
         this.on('sf.course_id', '=', 'c.course_code').andOn('sf.dept_id', '=', 'c.dept_id');
       })
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id })
+      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
       .select('c.course_name', 'c.course_code', db.raw('AVG(sf.rating) as avg_rating'))
       .groupBy('sf.course_id', 'c.course_name', 'c.course_code');
 
@@ -172,7 +174,8 @@ const getTopFaculties = async (req, res) => {
       .join('global_student_feedback as fr', function() {
         this.on('fr.faculty_id', '=', 'f.faculty_id')
           .andOn('fr.course_id', '=', 'c.course_code')
-          .andOn('fr.dept_id', '=', 'f.dept_id');
+          .andOn('fr.dept_id', '=', 'f.dept_id')
+          .andOn('fr.is_genuine', '=', 1);
       })
       .join('global_sessions as s', function() {
         this.on('fr.session_id', '=', 's.session_id').andOn('fr.dept_id', '=', 's.dept_id');
@@ -212,8 +215,35 @@ const getTopFaculties = async (req, res) => {
 
 const getStudentRoster = async (req, res) => {
   const { dept_id, sem, section } = req.params;
+  const { role, faculty_id, dept_id: session_dept_id } = req.session || {};
   
   try {
+    // If faculty, verify they belong to this department and teach this semester/section
+    if (role === 'faculty') {
+      if (session_dept_id && session_dept_id.toUpperCase() !== dept_id.toUpperCase()) {
+        return res.status(403).json({ error: "Forbidden: Cannot access student rosters outside your department" });
+      }
+
+      const assignment = await db('global_assign')
+        .where({
+          faculty_id,
+          dept_id,
+          sem,
+          section
+        })
+        .first();
+
+      if (!assignment) {
+        return res.status(403).json({ error: "Forbidden: You are only permitted to view student rosters for classes you teach" });
+      }
+    } else if (role === 'department') {
+      if (session_dept_id && session_dept_id.toUpperCase() !== dept_id.toUpperCase()) {
+        return res.status(403).json({ error: "Forbidden: Cross-department access strictly prohibited" });
+      }
+    } else if (role !== 'admin') {
+      return res.status(403).json({ error: "Forbidden: Unauthorized access" });
+    }
+
     const students = await db('global_students')
       .where({ dept_id, sem, section })
       .select('usn', 'name', 'feedback_given', 'session_id')
