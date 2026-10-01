@@ -245,6 +245,9 @@ const submitFeedback = async (req, res) => {
       io.emit("NEW_FEEDBACK_RECEIVED", { dept_id });
     }
 
+    // Enterprise Audit: Record anonymous evaluation submission
+    await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${session_id} (${ratingsToInsert.length} ratings processed)`, 'SUCCESS');
+
     res.json({ message: "Feedback submitted successfully" });
   } catch (err) {
     await trx.rollback();

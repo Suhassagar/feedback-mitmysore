@@ -15,6 +15,7 @@ const sensitiveLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 500, 
   keyGenerator: (req) => req.session?.usn || req.ip,
+  validate: { keyGeneratorIpFallback: false },
   message: { error: "Too many requests to this endpoint, please try again later." }
 });
 

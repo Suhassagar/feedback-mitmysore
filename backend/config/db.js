@@ -72,6 +72,25 @@ db.schema.hasTable('global_section_remarks').then(exists => {
     }).then(() => console.log('✅ Created missing global_section_remarks table in database'));
   }
 }).catch(e => console.error('Auto-migration warning (global_section_remarks):', e.message));
+// Self-healing: Ensure global_department_activity_logs exists on boot
+db.schema.hasTable('global_department_activity_logs').then(exists => {
+  if (!exists) {
+    return db.schema.createTable('global_department_activity_logs', table => {
+      table.increments('log_id').primary();
+      table.string('dept_id', 50).notNullable();
+      table.string('action_type', 50).notNullable();
+      table.string('entity', 50).notNullable().defaultTo('SYSTEM');
+      table.text('description').notNullable();
+      table.string('ip_address', 100).nullable();
+      table.string('device_info', 255).nullable();
+      table.string('status', 20).defaultTo('SUCCESS');
+      table.timestamp('created_at').defaultTo(db.fn.now());
+      table.index(['dept_id', 'created_at'], 'idx_activity_dept_created');
+      table.index(['action_type'], 'idx_activity_action');
+    }).then(() => console.log('✅ Created missing global_department_activity_logs table in database'));
+  }
+}).catch(e => console.error('Auto-migration warning (global_department_activity_logs):', e.message));
+
 async function ensurePerformanceIndexes() {
   try {
     const feedbackExists = await db.schema.hasTable('global_student_feedback');
@@ -97,6 +116,21 @@ async function ensurePerformanceIndexes() {
     const studentsExists = await db.schema.hasTable('global_students');
     if (studentsExists) {
       await db.raw('ALTER TABLE global_students ADD INDEX idx_students_dept_sem_sec (dept_id, sem, section)').catch(err => {
+        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
+          // Ignored if index already exists
+        }
+      });
+    }
+
+    const logsExists = await db.schema.hasTable('global_department_activity_logs');
+    if (logsExists) {
+      await db.schema.hasColumn('global_department_activity_logs', 'status').then(async exists => {
+        if (!exists) {
+          await db.schema.table('global_department_activity_logs', t => t.string('status', 20).defaultTo('SUCCESS'));
+          console.log('✅ Added missing status column to global_department_activity_logs');
+        }
+      });
+      await db.raw('ALTER TABLE global_department_activity_logs ADD INDEX idx_activity_dept_created (dept_id, created_at)').catch(err => {
         if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
           // Ignored if index already exists
         }

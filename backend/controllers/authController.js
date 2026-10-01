@@ -16,9 +16,11 @@ const adminLogin = async (req, res) => {
         req.session.role = 'admin';
         req.session.username = username;
         req.session.name = 'Administrator';
+        await logActivity(req, 'ADMIN', 'LOGIN', 'AUTH', `System Administrator (${username}) logged in`, 'SUCCESS');
         return res.json({ success: true, message: "Login successful" });
       }
     }
+    await logActivity(req, 'ADMIN', 'FAILED_LOGIN', 'SECURITY', `Failed admin login attempt for user: ${username}`, 'FAILED');
     res.json({ success: false, message: "Invalid username or password" });
   } catch (err) {
     console.error("Admin Login Error:", err);
@@ -34,6 +36,7 @@ const departmentLogin = async (req, res) => {
   
   if (deptRows.length > 0) {
     if (deptRows[0].is_active === 0) {
+      await logActivity(req, deptRows[0].dept_id, 'BLOCKED_LOGIN', 'SECURITY', `Suspended department account (${deptRows[0].dept_id}) attempted login`, 'WARNING');
       return res.json({ success: false, message: "Your department account has been suspended by the Admin." });
     }
     const isMatch = await bcrypt.compare(password, deptRows[0].password);
@@ -43,11 +46,12 @@ const departmentLogin = async (req, res) => {
       req.session.dept_name = deptRows[0].dept_name;
       req.session.name = deptRows[0].dept_name;
       
-      await logActivity(req, deptRows[0].dept_id, 'LOGIN', 'AUTH', 'Logged into the system');
+      await logActivity(req, deptRows[0].dept_id, 'LOGIN', 'AUTH', 'Logged into the system', 'SUCCESS');
       
       return res.json({ success: true, message: "Login successful", dept_id: deptRows[0].dept_id, dept_name: deptRows[0].dept_name });
     }
   }
+  await logActivity(req, username ? username.toUpperCase() : 'UNKNOWN', 'FAILED_LOGIN', 'SECURITY', `Failed department login attempt for username: ${username}`, 'FAILED');
   res.json({ success: false, message: "Invalid username or password" });
 };
 
@@ -57,13 +61,17 @@ const facultyLogin = async (req, res) => {
   email = email.trim().toLowerCase();
   try {
     const dirRows = await db('global_directory').where({ user_id: email, role: 'faculty' }).select('dept_id').limit(1);
-    if (dirRows.length === 0) return res.json({ success: false, message: "Invalid email or password" });
+    if (dirRows.length === 0) {
+      await logActivity(req, 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for unregistered email: ${email}`, 'FAILED');
+      return res.json({ success: false, message: "Invalid email or password" });
+    }
     
     const dept_id = dirRows[0].dept_id;
     const facultyRows = await db('global_faculty').where({ email, dept_id }).limit(1);
     
     if (facultyRows.length > 0) {
       if (facultyRows[0].is_active === 0) {
+        await logActivity(req, dept_id, 'BLOCKED_LOGIN', 'SECURITY', `Disabled faculty account (${email}) attempted login`, 'WARNING');
         return res.json({ success: false, message: "Account disabled by Admin" });
       }
       
@@ -73,9 +81,11 @@ const facultyLogin = async (req, res) => {
         req.session.dept_id = dept_id;
         req.session.faculty_id = facultyRows[0].faculty_id;
         req.session.name = facultyRows[0].name;
+        await logActivity(req, dept_id, 'LOGIN', 'AUTH', `Faculty member ${facultyRows[0].name} (${facultyRows[0].faculty_id}) logged in`, 'SUCCESS');
         return res.json({ success: true, message: "Login successful", faculty: { faculty_id: facultyRows[0].faculty_id, name: facultyRows[0].name, dept_id } });
       }
     }
+    await logActivity(req, dept_id || 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for email: ${email}`, 'FAILED');
     res.json({ success: false, message: "Invalid email or password" });
   } catch (err) {
     console.error("Faculty Login Error:", err);
@@ -172,10 +182,11 @@ const studentLogin = async (req, res) => {
 };
 
 const logout = async (req, res) => {
-  const dept_id = req.session?.dept_id;
+  const actor = req.session?.dept_id || (req.session?.role === 'admin' ? 'ADMIN' : (req.session?.faculty_id ? `FACULTY-${req.session.faculty_id}` : null));
+  const roleName = req.session?.role ? req.session.role.toUpperCase() : 'USER';
   
-  if (dept_id) {
-    await logActivity(req, dept_id, 'LOGOUT', 'AUTH', 'Logged out of the system');
+  if (actor) {
+    await logActivity(req, actor, 'LOGOUT', 'AUTH', `${roleName} logged out of the system`, 'SUCCESS');
   }
 
   req.session.destroy(err => {
@@ -186,10 +197,11 @@ const logout = async (req, res) => {
 };
 
 const silentLogout = async (req, res) => {
-  const dept_id = req.session?.dept_id;
+  const actor = req.session?.dept_id || (req.session?.role === 'admin' ? 'ADMIN' : (req.session?.faculty_id ? `FACULTY-${req.session.faculty_id}` : null));
+  const roleName = req.session?.role ? req.session.role.toUpperCase() : 'USER';
   
-  if (dept_id) {
-    await logActivity(req, dept_id, 'LOGOUT', 'AUTH', 'Logged out (Browser Tab Closed)');
+  if (actor) {
+    await logActivity(req, actor, 'LOGOUT', 'AUTH', `${roleName} logged out (Browser Tab Closed)`, 'SUCCESS');
   }
 
   req.session.destroy(err => {

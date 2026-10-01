@@ -213,12 +213,43 @@ const resetDepartmentFaculty = async (req, res) => {
 
 const getDepartmentLogs = async (req, res) => {
   const { dept_id } = req.params;
+  const { action, search, limit = 100 } = req.query;
+
   try {
-    const logs = await db('global_department_activity_logs')
-      .where({ dept_id })
-      .select('*', db.raw("DATE_FORMAT(created_at, '%b %d, %Y %I:%i %p') AS formatted_date"))
+    const cleanDept = String(dept_id).trim().toUpperCase();
+    let query = db('global_department_activity_logs')
+      .whereRaw('UPPER(dept_id) = ?', [cleanDept]);
+
+    if (action && action !== 'ALL') {
+      query = query.andWhereRaw('UPPER(action_type) = ?', [String(action).toUpperCase()]);
+    }
+
+    if (search && search.trim() !== '') {
+      const s = `%${search.trim()}%`;
+      query = query.andWhere(builder => {
+        builder.where('description', 'like', s)
+          .orWhere('entity', 'like', s)
+          .orWhere('device_info', 'like', s)
+          .orWhere('ip_address', 'like', s);
+      });
+    }
+
+    const logs = await query
+      .select(
+        'log_id',
+        'dept_id',
+        'action_type',
+        'entity',
+        'description',
+        'ip_address',
+        'device_info',
+        'created_at',
+        db.raw("COALESCE(status, 'SUCCESS') as status"),
+        db.raw("DATE_FORMAT(created_at, '%b %d, %Y %I:%i %p') AS formatted_date")
+      )
       .orderBy('log_id', 'desc')
-      .limit(50);
+      .limit(Math.min(parseInt(limit, 10) || 100, 500));
+
     res.json(logs);
   } catch (err) {
     console.error("Error fetching logs:", err);
@@ -372,8 +403,29 @@ const updateAdminUsername = async (req, res) => {
 };
 
 const getAdminAuditLogs = async (req, res) => {
+  const { action, dept_id, search, limit = 150 } = req.query;
   try {
-    const logs = await db('global_department_activity_logs')
+    let query = db('global_department_activity_logs');
+
+    if (dept_id && dept_id !== 'ALL') {
+      query = query.whereRaw('UPPER(dept_id) = ?', [String(dept_id).toUpperCase()]);
+    }
+
+    if (action && action !== 'ALL') {
+      query = query.andWhereRaw('UPPER(action_type) = ?', [String(action).toUpperCase()]);
+    }
+
+    if (search && search.trim() !== '') {
+      const s = `%${search.trim()}%`;
+      query = query.andWhere(builder => {
+        builder.where('description', 'like', s)
+          .orWhere('entity', 'like', s)
+          .orWhere('dept_id', 'like', s)
+          .orWhere('ip_address', 'like', s);
+      });
+    }
+
+    const logs = await query
       .select(
         'log_id',
         'created_at as timestamp',
@@ -381,10 +433,12 @@ const getAdminAuditLogs = async (req, res) => {
         'dept_id as user_name',
         'action_type as action',
         'description as details',
-        db.raw("'success' as status")
+        'ip_address',
+        'device_info',
+        db.raw("LOWER(COALESCE(status, 'SUCCESS')) as status")
       )
       .orderBy('log_id', 'desc')
-      .limit(100);
+      .limit(Math.min(parseInt(limit, 10) || 150, 500));
 
     res.json(logs);
   } catch (err) {
