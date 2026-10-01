@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 // 1. General API Rate Limiter
 // Prevents basic abuse of general GET endpoints
@@ -9,13 +9,12 @@ const apiLimiter = rateLimit({
 });
 
 // 2. Sensitive Endpoints Limiter
-// Keyed by student USN / session when available, with higher ceiling (500)
-// to prevent blocking college computer labs sharing a single NAT gateway IP.
+// Keyed by student USN / session when available, falling back to official IPv6-safe ipKeyGenerator.
+// Uses a high ceiling (500) to support computer labs sharing a single NAT gateway IP.
 const sensitiveLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 500, 
-  keyGenerator: (req) => req.session?.usn || req.ip,
-  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => req.session?.usn || ipKeyGenerator(req.ip),
   message: { error: "Too many requests to this endpoint, please try again later." }
 });
 
