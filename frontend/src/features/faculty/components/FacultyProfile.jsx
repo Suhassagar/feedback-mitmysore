@@ -13,6 +13,8 @@ import EditFacultyModal from "./EditFacultyModal";
 import FacultyChatModal from "./FacultyChatModal";
 import OverallAnalyticsModal from "./OverallAnalyticsModal";
 import { useDepartmentName } from "../../../hooks/useDepartmentName";
+import ConfirmModal from "../../../components/ui/ConfirmModal";
+import EmptyState from "../../../components/ui/EmptyState";
 
 export default function FacultyProfile({ 
   selectedFaculty, 
@@ -25,6 +27,8 @@ export default function FacultyProfile({
   const [assignedSubjects, setAssignedSubjects] = useState([]);
   const [facultyAnalytics, setFacultyAnalytics] = useState(null);
   const [facultyNotes, setFacultyNotes] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [subjectToRemove, setSubjectToRemove] = useState(null);
   
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
@@ -44,6 +48,7 @@ export default function FacultyProfile({
   }, [selectedFaculty]);
 
   const loadFacultyData = async () => {
+    setIsLoadingData(true);
     setAssignedSubjects([]);
     setFacultyAnalytics(null);
     setFacultyNotes([]);
@@ -58,14 +63,21 @@ export default function FacultyProfile({
       setFacultyNotes(notesRes.data);
     } catch (err) { 
       toast.error(`Load Error: ${err.message}`); 
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
-  const handleRemoveAssignedSubject = async (course_code) => {
-    if (!window.confirm("Are you sure you want to remove this assigned subject?")) return;
+  const handleRemoveAssignedSubject = (course_code) => {
+    setSubjectToRemove(course_code);
+  };
+
+  const confirmRemoveSubject = async () => {
+    if (!subjectToRemove) return;
     try {
-      await apiClient.delete(`/faculty/assigned/${selectedFaculty.faculty_id}/${course_code}`, { withCredentials: true });
+      await apiClient.delete(`/faculty/assigned/${selectedFaculty.faculty_id}/${subjectToRemove}`, { withCredentials: true });
       toast.success("Assigned subject removed");
+      setSubjectToRemove(null);
       loadFacultyData();
     } catch (err) {
       toast.error("Error removing assigned subject");
@@ -360,10 +372,21 @@ export default function FacultyProfile({
               </div>
             )}
             
-            {assignedSubjects.length === 0 ? (
-              <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", border: "1px dashed var(--border-color)", borderRadius: "12px" }}>
-                No subjects assigned yet.
+            {isLoadingData ? (
+              <div className="flex-col" style={{ gap: "12px" }}>
+                {[1, 2].map((i) => (
+                  <div key={i} className="skeleton" style={{ height: "68px", borderRadius: "12px", width: "100%" }} />
+                ))}
               </div>
+            ) : assignedSubjects.length === 0 ? (
+              <EmptyState
+                icon={BookOpen}
+                title="No Subjects Assigned"
+                description="This faculty member does not have any active course allocations for this department."
+                actionText="Assign Subject"
+                onAction={() => { setShowAssignModal(true); fetchDepartmentCourses(); }}
+                compact
+              />
             ) : (
               <div className="flex-col" style={{ gap: "12px" }}>
                 {assignedSubjects.map((sub, idx) => (
@@ -532,6 +555,16 @@ export default function FacultyProfile({
         setShowOverallAnalyticsModal={setShowOverallAnalyticsModal}
         selectedFaculty={selectedFaculty}
         facultyAnalytics={facultyAnalytics}
+      />
+
+      <ConfirmModal
+        isOpen={!!subjectToRemove}
+        title="Remove Assigned Subject"
+        message={`Are you sure you want to unassign subject ${subjectToRemove} from ${selectedFaculty?.name}?`}
+        confirmText="Remove Subject"
+        isDestructive={true}
+        onConfirm={confirmRemoveSubject}
+        onClose={() => setSubjectToRemove(null)}
       />
 
     </div>

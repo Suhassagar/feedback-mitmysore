@@ -80,32 +80,32 @@
 .glass-select,
 .form-input {
   width: 100%;
-  height: 52px;
+  height: 50px;
   padding: 0 var(--space-16);
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-input);
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 12px !important;
   color: var(--text-primary);
   font-family: var(--font-family);
-  font-size: var(--text-body);
+  font-size: 14.5px;
   outline: none;
-  transition: all var(--transition-fast);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
 .glass-input::placeholder,
 .form-input::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.7;
+  color: #94A3B8;
+  opacity: 1;
 }
 
 .glass-input:focus,
 .glass-select:focus,
 .form-input:focus {
-  border-color: var(--primary);
-  background: var(--card-bg);
-  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-color: #2563EB !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15) !important;
 }
 
 .glass-select,
@@ -185,23 +185,31 @@
 }
 
 .btn-delete {
-  background: var(--card-bg);
-  color: var(--danger);
-  border: 1px solid var(--border-color);
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
   height: 40px;
   padding: 0 var(--space-16);
   border-radius: var(--radius-btn);
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   font-size: var(--text-small);
   transition: all var(--transition-fast);
-  box-shadow: var(--shadow-btn);
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .btn-delete:hover {
-  background: #FEF2F2;
-  border-color: #FECACA;
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #DC2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+  transform: translateY(-1px);
 }
+
 
 .btn-track {
   background: transparent;
@@ -582,18 +590,28 @@ tr:hover td {
 .theme-admin .btn-primary { background: #16A34A !important; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2) !important; }
 .theme-admin .btn-primary:hover { background: #15803D !important; }
 .theme-admin .login-options a { color: #16A34A; }
+.theme-admin .login-back-link { color: #16A34A; }
+.theme-admin .form-input:focus, .theme-admin .glass-input:focus, .theme-admin textarea:focus, .theme-admin select:focus { outline: none !important; outline-offset: 0 !important; border-color: #16A34A !important; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2) !important; }
+.theme-admin .dashboard-sidebar { background-color: #062E1B !important; border-right: 1px solid rgba(16, 185, 129, 0.15) !important; }
+.theme-admin .sidebar-nav-item { color: #A7F3D0; }
+.theme-admin .sidebar-nav-item.active { background: #16A34A !important; color: #ffffff !important; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.4) !important; }
+.theme-admin .sidebar-nav-item:hover:not(.active) { background: rgba(255, 255, 255, 0.1) !important; color: #ffffff !important; }
 
 .theme-department .login-left-panel { background: #EFF6FF; color: #2563EB; }
 .theme-department .login-icon-badge { background: #2563EB; }
 .theme-department .btn-primary { background: #2563EB !important; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2) !important; }
 .theme-department .btn-primary:hover { background: #1D4ED8 !important; }
 .theme-department .login-options a { color: #2563EB; }
+.theme-department .login-back-link { color: #2563EB; }
+.theme-department .form-input:focus, .theme-department .glass-input:focus, .theme-department textarea:focus, .theme-department select:focus { outline: none !important; outline-offset: 0 !important; border-color: #2563EB !important; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2) !important; }
 
 .theme-faculty .login-left-panel { background: #FAF5FF; color: #A855F7; }
 .theme-faculty .login-icon-badge { background: #7C3AED; }
 .theme-faculty .btn-primary { background: #7C3AED !important; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2) !important; }
 .theme-faculty .btn-primary:hover { background: #6D28D9 !important; }
 .theme-faculty .login-options a { color: #7C3AED; }
+.theme-faculty .login-back-link { color: #7C3AED; }
+.theme-faculty .form-input:focus, .theme-faculty .glass-input:focus, .theme-faculty textarea:focus, .theme-faculty select:focus { outline: none !important; outline-offset: 0 !important; border-color: #7C3AED !important; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2) !important; }
 
 .theme-student .login-left-panel { background: #FFF7ED; color: #F97316; }
 .theme-student .login-icon-badge { background: #EA580C; }
@@ -601,6 +619,7 @@ tr:hover td {
 .theme-student .btn-primary:hover { background: #C2410C !important; }
 .theme-student .login-options a { color: #EA580C; }
 .theme-student .login-back-link { color: #EA580C; }
+.theme-student .form-input:focus, .theme-student .glass-input:focus, .theme-student textarea:focus, .theme-student select:focus { outline: none !important; outline-offset: 0 !important; border-color: #EA580C !important; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.2) !important; }
 
 @media (max-width: 768px) {
   .login-split-card {
@@ -659,7 +678,7 @@ tr:hover td {
   background-color: #F8FAFC;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .dashboard-sidebar {
@@ -717,13 +736,14 @@ tr:hover td {
 
 .dashboard-header {
   grid-area: header;
-  background-color: rgba(255, 255, 255, 0.85);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
-  position: sticky;
-  top: 0;
-  z-index: 50;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -11,21 +11,16 @@ export function useFaculties(dept_id) {
     setLoading(true);
     try {
       const res = await apiClient.get(`/faculty/by-dept/${dept_id}`, { withCredentials: true });
-      const facs = res.data;
+      const facs = res.data || [];
       
-      const facsWithRatings = await Promise.all(facs.map(async (f) => {
-        try {
-          const r = await apiClient.get(`/feedback/subjects_with_avg/${f.faculty_id}`, { withCredentials: true });
-          const subjects = r.data;
-          if (subjects.length > 0) {
-            const avg = subjects.reduce((acc, curr) => acc + parseFloat(curr.avg_rating), 0) / subjects.length;
-            return { ...f, avgRating: avg.toFixed(1) };
-          }
-          return { ...f, avgRating: "N/A" };
-        } catch(err) {
-          return { ...f, avgRating: "N/A" };
-        }
-      }));
+      const facsWithRatings = facs.map((f) => {
+        const ratingNum = parseFloat(f.avg_rating);
+        const hasFeedback = (f.total_feedback && parseInt(f.total_feedback) > 0) || ratingNum > 0;
+        return {
+          ...f,
+          avgRating: hasFeedback ? ratingNum.toFixed(2) : "N/A"
+        };
+      });
       
       facsWithRatings.sort((a, b) => {
         if (a.avgRating === "N/A") return 1;

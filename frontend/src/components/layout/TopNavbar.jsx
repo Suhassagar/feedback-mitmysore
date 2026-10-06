@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
-import { Search, GraduationCap, User, Menu } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Search, GraduationCap, User, Menu, LogOut, ShieldCheck, ChevronDown } from "lucide-react";
 import { useUIStore } from "../../store/useUIStore";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import NotificationBell from "../ui/NotificationBell";
-import useDepartmentName from "../../hooks/useDepartmentName";
+import { useDepartmentProfile } from "../../hooks/useDepartmentName";
+import DepartmentAvatar from "../ui/DepartmentAvatar";
 
 export default function TopNavbar({ dept_id }) {
   const navigate = useNavigate();
@@ -18,12 +19,18 @@ export default function TopNavbar({ dept_id }) {
     setMobileMenuOpen
   } = useUIStore();
 
-  const deptName = useDepartmentName(dept_id);
+  const deptProfile = useDepartmentProfile(dept_id);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const profileRef = useRef(null);
+
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowSearchDropdown(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -133,21 +140,142 @@ export default function TopNavbar({ dept_id }) {
           overflow: "hidden",
           textOverflow: "ellipsis"
         }}>
-          {deptName ? deptName.toUpperCase() : ""}
+          {deptProfile?.dept_name ? deptProfile.dept_name.toUpperCase() : (dept_id || '').toUpperCase()}
         </div>
       </div>
 
-      {/* Right Side Icons */}
-      <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+      {/* Right Side Icons & Profile Avatar */}
+      <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
         <NotificationBell dept_id={dept_id} />
         
-        <div style={{ 
-          width: "40px", height: "40px", borderRadius: "50%", 
-          background: "var(--primary)", color: "white", 
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: "bold", boxShadow: "var(--shadow-btn)"
-        }}>
-          <User size={20} />
+        {/* Department Profile Avatar & Popover */}
+        <div style={{ position: "relative" }} ref={profileRef}>
+          <button
+            onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              outline: "none"
+            }}
+            title={deptProfile?.dept_name || dept_id}
+          >
+            <DepartmentAvatar
+              dept_id={dept_id}
+              logo_url={deptProfile?.logo_url}
+              logo_lqip={deptProfile?.logo_lqip}
+              size={40}
+              showRing={true}
+            />
+            <ChevronDown size={14} color="#64748B" style={{ transform: showProfileDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          </button>
+
+          {showProfileDropdown && (
+            <div
+              className="card"
+              style={{
+                position: "absolute",
+                top: "50px",
+                right: 0,
+                width: "280px",
+                padding: "16px",
+                zIndex: 1000,
+                boxShadow: "0 20px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)",
+                borderRadius: "16px",
+                border: "1px solid var(--border-color)",
+                background: "#FFFFFF"
+              }}
+            >
+              {/* Header inside popover */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                <DepartmentAvatar
+                  dept_id={dept_id}
+                  logo_url={deptProfile?.logo_url}
+                  logo_lqip={deptProfile?.logo_lqip}
+                  size={46}
+                />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {deptProfile?.dept_name || dept_id}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", padding: "2px 6px", borderRadius: "4px" }}>
+                      {dept_id.toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                      {user?.role === 'admin' ? 'Admin View' : 'Department Portal'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ height: "1px", background: "var(--border-color)", margin: "8px 0" }} />
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
+                <button
+                  onClick={() => {
+                    setShowProfileDropdown(false);
+                    navigate(`/settings/${dept_id}`);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "none",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <ShieldCheck size={16} color="var(--primary)" />
+                  <span>Department Settings</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      await apiClient.post("/logout");
+                      window.location.href = "/";
+                    } catch {
+                      window.location.href = "/";
+                    }
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "none",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "#EF4444",
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#FEE2E2'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <LogOut size={16} color="#EF4444" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -4,7 +4,7 @@ import { toast } from "react-hot-toast";
 
 export function useAnalytics(dept_id) {
   const [analytics, setAnalytics] = useState({
-    avgRating: "0.0",
+    avgRating: "0.00",
     totalSubmitted: 0,
     totalStudents: 0,
     trendData: []

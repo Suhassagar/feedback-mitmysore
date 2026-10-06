@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
 
-// Global cache for departments across component mounts
+// Global cache for department profiles across component mounts
 let globalDeptMap = null;
 let fetchPromise = null;
 
@@ -28,6 +28,14 @@ export const STATIC_DEPT_NAMES = {
   mca: "Master of Computer Applications"
 };
 
+export function invalidateDepartmentCache() {
+  globalDeptMap = null;
+  fetchPromise = null;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('departmentBrandingUpdated'));
+  }
+}
+
 export function getDepartmentNameSync(dept_id, user) {
   if (!dept_id) return "";
   const cleanId = String(dept_id).trim().toLowerCase();
@@ -39,71 +47,104 @@ export function getDepartmentNameSync(dept_id, user) {
 
   // 2. If present in global fetched cache
   if (globalDeptMap && globalDeptMap[cleanId]) {
-    return globalDeptMap[cleanId];
+    return globalDeptMap[cleanId].dept_name;
   }
 
   // 3. Fallback to static dictionary or capitalized abbreviation
   return STATIC_DEPT_NAMES[cleanId] || dept_id;
 }
 
-export function useDepartmentName(dept_id) {
+export function useDepartmentProfile(dept_id) {
   const { user } = useAuth();
-  const [deptName, setDeptName] = useState(() => getDepartmentNameSync(dept_id, user));
+  const cleanId = String(dept_id || '').trim().toLowerCase();
+
+  const getProfileData = useCallback(() => {
+    // 1. Match logged in user if applicable
+    if (user?.dept_id && String(user.dept_id).trim().toLowerCase() === cleanId) {
+      return {
+        dept_id: user.dept_id,
+        dept_name: user.dept_name || STATIC_DEPT_NAMES[cleanId] || user.dept_id,
+        logo_url: user.logo_url || null,
+        brand_color: user.brand_color || '#2563EB',
+        brand_accent: user.brand_accent || '#1E40AF',
+        logo_lqip: user.logo_lqip || null
+      };
+    }
+
+    // 2. Check cached roster
+    if (globalDeptMap && globalDeptMap[cleanId]) {
+      return globalDeptMap[cleanId];
+    }
+
+    // 3. Fallback skeleton
+    return {
+      dept_id,
+      dept_name: STATIC_DEPT_NAMES[cleanId] || dept_id || '',
+      logo_url: null,
+      brand_color: '#2563EB',
+      brand_accent: '#1E40AF',
+      logo_lqip: null
+    };
+  }, [cleanId, dept_id, user]);
+
+  const [profile, setProfile] = useState(getProfileData);
 
   useEffect(() => {
-    if (!dept_id) {
-      setDeptName("");
-      return;
-    }
+    setProfile(getProfileData());
 
-    const cleanId = String(dept_id).trim().toLowerCase();
-
-    // 1. Check logged-in user context
-    if (user?.dept_id && String(user.dept_id).trim().toLowerCase() === cleanId && user.dept_name) {
-      setDeptName(user.dept_name);
-      return;
-    }
-
-    // 2. Check global cache
-    if (globalDeptMap && globalDeptMap[cleanId]) {
-      setDeptName(globalDeptMap[cleanId]);
-      return;
-    }
-
-    // 3. Set static map while fetching
-    if (STATIC_DEPT_NAMES[cleanId]) {
-      setDeptName(STATIC_DEPT_NAMES[cleanId]);
-    }
-
-    // 4. Fetch dynamic list from server to capture custom departments
-    if (!fetchPromise) {
-      fetchPromise = apiClient.get('/departments')
-        .then(res => {
-          const map = {};
-          if (Array.isArray(res.data)) {
-            res.data.forEach(d => {
-              if (d.dept_id && d.dept_name) {
-                map[String(d.dept_id).trim().toLowerCase()] = d.dept_name;
-              }
-            });
-          }
-          globalDeptMap = map;
-          return map;
-        })
-        .catch(err => {
-          console.warn("Failed to fetch department roster for name lookup:", err);
-          return STATIC_DEPT_NAMES;
-        });
-    }
-
-    fetchPromise.then(map => {
-      if (map && map[cleanId]) {
-        setDeptName(map[cleanId]);
+    const loadData = () => {
+      if (!fetchPromise) {
+        fetchPromise = apiClient.get('/departments')
+          .then(res => {
+            const map = {};
+            if (Array.isArray(res.data)) {
+              res.data.forEach(d => {
+                if (d.dept_id) {
+                  const key = String(d.dept_id).trim().toLowerCase();
+                  map[key] = {
+                    dept_id: d.dept_id,
+                    dept_name: d.dept_name,
+                    logo_url: d.logo_url || null,
+                    brand_color: d.brand_color || '#2563EB',
+                    brand_accent: d.brand_accent || '#1E40AF',
+                    logo_lqip: d.logo_lqip || null
+                  };
+                }
+              });
+            }
+            globalDeptMap = map;
+            return map;
+          })
+          .catch(err => {
+            console.warn("Failed to fetch department roster:", err);
+            return {};
+          });
       }
-    });
-  }, [dept_id, user]);
 
-  return deptName;
+      fetchPromise.then(map => {
+        if (map && map[cleanId]) {
+          setProfile(map[cleanId]);
+        }
+      });
+    };
+
+    loadData();
+
+    const handleUpdate = () => {
+      fetchPromise = null;
+      loadData();
+    };
+
+    window.addEventListener('departmentBrandingUpdated', handleUpdate);
+    return () => window.removeEventListener('departmentBrandingUpdated', handleUpdate);
+  }, [cleanId, getProfileData]);
+
+  return profile;
+}
+
+export function useDepartmentName(dept_id) {
+  const profile = useDepartmentProfile(dept_id);
+  return profile.dept_name || dept_id;
 }
 
 export default useDepartmentName;

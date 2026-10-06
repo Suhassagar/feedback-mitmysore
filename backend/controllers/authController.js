@@ -45,10 +45,23 @@ const departmentLogin = async (req, res) => {
       req.session.dept_id = deptRows[0].dept_id;
       req.session.dept_name = deptRows[0].dept_name;
       req.session.name = deptRows[0].dept_name;
+      req.session.logo_url = deptRows[0].logo_url;
+      req.session.brand_color = deptRows[0].brand_color;
+      req.session.brand_accent = deptRows[0].brand_accent;
+      req.session.logo_lqip = deptRows[0].logo_lqip;
       
       await logActivity(req, deptRows[0].dept_id, 'LOGIN', 'AUTH', 'Logged into the system', 'SUCCESS');
       
-      return res.json({ success: true, message: "Login successful", dept_id: deptRows[0].dept_id, dept_name: deptRows[0].dept_name });
+      return res.json({ 
+        success: true, 
+        message: "Login successful", 
+        dept_id: deptRows[0].dept_id, 
+        dept_name: deptRows[0].dept_name,
+        logo_url: deptRows[0].logo_url,
+        brand_color: deptRows[0].brand_color,
+        brand_accent: deptRows[0].brand_accent,
+        logo_lqip: deptRows[0].logo_lqip
+      });
     }
   }
   await logActivity(req, username ? username.toUpperCase() : 'UNKNOWN', 'FAILED_LOGIN', 'SECURITY', `Failed department login attempt for username: ${username}`, 'FAILED');
@@ -57,39 +70,59 @@ const departmentLogin = async (req, res) => {
 
 const facultyLogin = async (req, res) => {
   let { email, password } = req.body;
-  if (!email || !password) return res.json({ success: false, message: "Email and password are required" });
-  email = email.trim().toLowerCase();
+  if (!email || !password) return res.json({ success: false, message: "Email/ID and password are required" });
+  const searchInput = email.trim().toLowerCase();
+
   try {
-    const dirRows = await db('global_directory').where({ user_id: email, role: 'faculty' }).select('dept_id').limit(1);
-    if (dirRows.length === 0) {
-      await logActivity(req, 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for unregistered email: ${email}`, 'FAILED');
-      return res.json({ success: false, message: "Invalid email or password" });
-    }
-    
-    const dept_id = dirRows[0].dept_id;
-    const facultyRows = await db('global_faculty').where({ email, dept_id }).limit(1);
-    
-    if (facultyRows.length > 0) {
-      if (facultyRows[0].is_active === 0) {
-        await logActivity(req, dept_id, 'BLOCKED_LOGIN', 'SECURITY', `Disabled faculty account (${email}) attempted login`, 'WARNING');
-        return res.json({ success: false, message: "Account disabled by Admin" });
+    // Search global_faculty first by email OR faculty_id (case insensitive)
+    const faculty = await db('global_faculty')
+      .whereRaw('LOWER(email) = ? OR LOWER(faculty_id) = ?', [searchInput, searchInput])
+      .first();
+
+    if (!faculty) {
+      // Check if registration is pending approval
+      const pending = await db('global_pending_faculty_registrations')
+        .whereRaw('LOWER(email) = ? OR LOWER(faculty_id) = ?', [searchInput, searchInput])
+        .first();
+
+      if (pending) {
+        return res.json({ success: false, message: "Your registration is currently pending HOD / Admin approval." });
       }
-      
-      const isMatch = await bcrypt.compare(password, facultyRows[0].password);
-      if (isMatch) {
-        req.session.role = 'faculty';
-        req.session.dept_id = dept_id;
-        req.session.faculty_id = facultyRows[0].faculty_id;
-        req.session.name = facultyRows[0].name;
-        await logActivity(req, dept_id, 'LOGIN', 'AUTH', `Faculty member ${facultyRows[0].name} (${facultyRows[0].faculty_id}) logged in`, 'SUCCESS');
-        return res.json({ success: true, message: "Login successful", faculty: { faculty_id: facultyRows[0].faculty_id, name: facultyRows[0].name, dept_id } });
-      }
+
+      await logActivity(req, 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for: ${searchInput}`, 'FAILED');
+      return res.json({ success: false, message: "Invalid email/ID or password" });
     }
-    await logActivity(req, dept_id || 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for email: ${email}`, 'FAILED');
-    res.json({ success: false, message: "Invalid email or password" });
+
+    if (faculty.is_active === 0) {
+      await logActivity(req, faculty.dept_id, 'BLOCKED_LOGIN', 'SECURITY', `Disabled faculty account (${searchInput}) attempted login`, 'WARNING');
+      return res.json({ success: false, message: "Account disabled by Admin" });
+    }
+
+    const isMatch = await bcrypt.compare(password, faculty.password);
+    if (isMatch) {
+      const deptIdUpper = (faculty.dept_id || '').toUpperCase();
+      req.session.role = 'faculty';
+      req.session.dept_id = deptIdUpper;
+      req.session.faculty_id = faculty.faculty_id;
+      req.session.name = faculty.name;
+
+      await logActivity(req, deptIdUpper, 'LOGIN', 'AUTH', `Faculty member ${faculty.name} (${faculty.faculty_id}) logged in`, 'SUCCESS');
+      return res.json({ 
+        success: true, 
+        message: "Login successful", 
+        faculty: { 
+          faculty_id: faculty.faculty_id, 
+          name: faculty.name, 
+          dept_id: deptIdUpper 
+        } 
+      });
+    }
+
+    await logActivity(req, faculty.dept_id || 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for: ${searchInput}`, 'FAILED');
+    res.json({ success: false, message: "Invalid email/ID or password" });
   } catch (err) {
     console.error("Faculty Login Error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error during login" });
   }
 };
 
@@ -213,22 +246,38 @@ const silentLogout = async (req, res) => {
 const checkSession = async (req, res) => {
   if (req.session && req.session.role) {
     let dept_name = req.session.dept_name;
+    let logo_url = req.session.logo_url;
+    let brand_color = req.session.brand_color;
+    let brand_accent = req.session.brand_accent;
+    let logo_lqip = req.session.logo_lqip;
     
-    // Auto-fill dept_name for existing active sessions
-    if (!dept_name && req.session.dept_id) {
+    // Auto-fill or refresh dept details for active sessions
+    if (req.session.dept_id) {
       try {
-        const d = await db('department').where({ dept_id: req.session.dept_id }).select('dept_name').first();
+        const d = await db('department')
+          .where({ dept_id: req.session.dept_id })
+          .select('dept_name', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip')
+          .first();
         if (d) {
           dept_name = d.dept_name;
+          logo_url = d.logo_url;
+          brand_color = d.brand_color;
+          brand_accent = d.brand_accent;
+          logo_lqip = d.logo_lqip;
+
           req.session.dept_name = dept_name;
-        } else {
+          req.session.logo_url = logo_url;
+          req.session.brand_color = brand_color;
+          req.session.brand_accent = brand_accent;
+          req.session.logo_lqip = logo_lqip;
+        } else if (req.session.role === 'department') {
           // Department was completely removed from the database!
           return req.session.destroy(() => {
             res.json({ success: false, message: "Department no longer exists. Please log in again." });
           });
         }
       } catch (e) {
-        console.error("Failed to fetch dept_name for session:", e);
+        console.error("Failed to fetch dept details for session:", e);
         dept_name = "Unknown Department";
       }
     }
@@ -244,7 +293,11 @@ const checkSession = async (req, res) => {
         faculty_id: req.session.faculty_id,
         usn: req.session.usn,
         sem: req.session.sem,
-        section: req.session.section
+        section: req.session.section,
+        logo_url,
+        brand_color: brand_color || '#2563EB',
+        brand_accent: brand_accent || '#1E40AF',
+        logo_lqip
       }
     });
   } else {

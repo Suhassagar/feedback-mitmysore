@@ -15,7 +15,7 @@ const getGlobalMetrics = async (req, res) => {
       db('global_students').count('* as c').first(),
       db('global_faculty').count('* as c').first(),
       db('global_sessions').where({ status: 'active' }).count('* as c').first(),
-      db('global_student_feedback').avg('rating as a').count('* as c').first(),
+      db('global_student_feedback').where('is_genuine', true).avg('rating as a').count('* as c').first(),
       db('global_students').where({ feedback_given: 'done' }).count('* as c').first(),
       db('global_students').whereNotNull('session_id').count('* as c').first()
     ]);
@@ -47,7 +47,7 @@ const getGlobalFaculties = async (req, res) => {
       .join('department as d', 'f.dept_id', 'd.dept_id')
       .select(
         'f.faculty_id', 'f.name', 'f.email', 'f.position', 'f.dob', 'f.joining_date', 'f.dept_id', 'd.dept_name',
-        db.raw(`(SELECT AVG(rating) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id) as avg_rating`)
+        db.raw(`(SELECT ROUND(COALESCE(AVG(rating), 0), 2) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id AND sf.is_genuine = 1) as avg_rating`)
       );
     res.json(rows);
   } catch (err) {
@@ -129,11 +129,11 @@ const getDepartmentSummaries = async (req, res) => {
       sessionCounts,
       ratingStats
     ] = await Promise.all([
-      db('department').select('dept_id', 'dept_name', 'is_active'),
+      db('department').select('dept_id', 'dept_name', 'is_active', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip'),
       db('global_students').select('dept_id').count('* as count').groupBy('dept_id'),
       db('global_faculty').select('dept_id').count('* as count').groupBy('dept_id'),
       db('global_sessions').where({ status: 'active' }).select('dept_id').count('* as count').groupBy('dept_id'),
-      db('global_student_feedback').select('dept_id').avg('rating as avg_rating').groupBy('dept_id')
+      db('global_student_feedback').where('is_genuine', true).select('dept_id').avg('rating as avg_rating').groupBy('dept_id')
     ]);
 
     const studentMap = Object.fromEntries(studentCounts.map(r => [r.dept_id, r.count]));
@@ -146,7 +146,7 @@ const getDepartmentSummaries = async (req, res) => {
       student_count: studentMap[d.dept_id] || 0,
       faculty_count: facultyMap[d.dept_id] || 0,
       active_sessions: sessionMap[d.dept_id] || 0,
-      avg_rating: ratingMap[d.dept_id] ? parseFloat(ratingMap[d.dept_id]).toFixed(2) : 0
+      avg_rating: ratingMap[d.dept_id] ? parseFloat(ratingMap[d.dept_id]).toFixed(2) : "0.00"
     }));
 
     res.json(summaries);

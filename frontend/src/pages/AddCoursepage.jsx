@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import apiClient from "../services/apiClient";
 import { useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { Search, Upload, Plus } from "lucide-react";
+import { Search, Upload, Plus, BookOpen } from "lucide-react";
 import PageTransition from "../components/PageTransition";
 import BulkUploadModal from "../components/BulkUploadModal";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import EmptyState from "../components/ui/EmptyState";
 
 function AddCoursePage() {
   const { dept_id } = useParams();
@@ -12,12 +14,17 @@ function AddCoursePage() {
   const [courseName, setCourseName] = useState("");
   const [courseCode, setCourseCode] = useState("");
   const [sem, setSem] = useState("");
+  const [formErrors, setFormErrors] = useState({});
 
   const [courses, setCourses] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [editCourse, setEditCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  
+  // Destructive Delete State (UIUX-008)
+  const [courseToDelete, setCourseToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch Courses of Department
   useEffect(() => {
@@ -36,37 +43,59 @@ function AddCoursePage() {
     }
   };
 
+  const validateCourseForm = () => {
+    const errors = {};
+    if (!courseName.trim()) errors.courseName = "Subject name is required";
+    if (!courseCode.trim()) errors.courseCode = "Subject code is required";
+    if (!sem) {
+      errors.sem = "Semester is required";
+    } else if (parseInt(sem, 10) < 1 || parseInt(sem, 10) > 8) {
+      errors.sem = "Sem must be 1-8";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAddCourse = async () => {
+    if (!validateCourseForm()) {
+      return toast.error("Please fill in all required fields highlighted in red");
+    }
     try {
       const res = await apiClient.post("/add-course", {
         dept_id,
-        course_name: courseName,
-        course_code: courseCode,
-        sem,
+        course_name: courseName.trim(),
+        course_code: courseCode.trim().toUpperCase(),
+        sem: parseInt(sem, 10),
       });
       if (res.data.success) {
         toast.success("Subject added successfully!");
         setCourseName("");
         setCourseCode("");
         setSem("");
+        setFormErrors({});
         fetchCourses();
       } else {
         toast.error("Failed to add subject");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Server error");
+      toast.error(err.response?.data?.error || "Server error");
     }
   };
 
-  const handleDeleteCourse = async (course_code) => {
-    if (!window.confirm("Delete this subject?")) return;
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
     try {
-      await apiClient.delete(`/course/${encodeURIComponent(course_code)}`);
+      setIsDeleting(true);
+      await apiClient.delete(`/course/${encodeURIComponent(courseToDelete.course_code)}`);
+      toast.success(`Subject ${courseToDelete.course_code} removed successfully`);
+      setCourseToDelete(null);
       fetchCourses();
     } catch (err) {
       console.error(err);
       toast.error("Error deleting: " + (err.response?.data?.error || err.message));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -104,16 +133,67 @@ function AddCoursePage() {
         {/* INLINE ADD SUBJECT PANEL */}
         <div className="card" style={{ padding: "20px", marginBottom: "24px", display: "flex", gap: "16px", alignItems: "flex-end", flexWrap: "wrap" }}>
           <div className="flex-col gap-sm" style={{ flex: 1, minWidth: "150px" }}>
-            <label className="field-label" style={{ fontSize: "13px" }}>Subject Name</label>
-            <input type="text" className="form-input" style={{ padding: "10px" }} placeholder="e.g. Database Management" value={courseName} onChange={(e) => setCourseName(e.target.value)} />
+            <label className="field-label" style={{ fontSize: "13px" }}>Subject Name *</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ 
+                padding: "10px",
+                borderColor: formErrors.courseName ? "#EF4444" : undefined,
+                boxShadow: formErrors.courseName ? "0 0 0 1px #EF4444" : undefined
+              }} 
+              placeholder="e.g. Database Management" 
+              value={courseName} 
+              onChange={(e) => {
+                setCourseName(e.target.value);
+                if (formErrors.courseName) setFormErrors(prev => ({ ...prev, courseName: "" }));
+              }} 
+            />
+            {formErrors.courseName && (
+              <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.courseName}</span>
+            )}
           </div>
           <div className="flex-col gap-sm" style={{ flex: 1, minWidth: "120px" }}>
-            <label className="field-label" style={{ fontSize: "13px" }}>Subject Code</label>
-            <input type="text" className="form-input" style={{ padding: "10px" }} placeholder="e.g. CS101" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} />
+            <label className="field-label" style={{ fontSize: "13px" }}>Subject Code *</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ 
+                padding: "10px",
+                borderColor: formErrors.courseCode ? "#EF4444" : undefined,
+                boxShadow: formErrors.courseCode ? "0 0 0 1px #EF4444" : undefined
+              }} 
+              placeholder="e.g. CS101" 
+              value={courseCode} 
+              onChange={(e) => {
+                setCourseCode(e.target.value);
+                if (formErrors.courseCode) setFormErrors(prev => ({ ...prev, courseCode: "" }));
+              }} 
+            />
+            {formErrors.courseCode && (
+              <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.courseCode}</span>
+            )}
           </div>
           <div className="flex-col gap-sm" style={{ flex: 1, minWidth: "120px" }}>
-            <label className="field-label" style={{ fontSize: "13px" }}>Semester</label>
-            <input type="number" className="form-input" style={{ padding: "10px" }} placeholder="1-8" value={sem} onChange={(e) => setSem(e.target.value)} />
+            <label className="field-label" style={{ fontSize: "13px" }}>Semester *</label>
+            <input 
+              type="number" 
+              className="form-input" 
+              style={{ 
+                padding: "10px",
+                borderColor: formErrors.sem ? "#EF4444" : undefined,
+                boxShadow: formErrors.sem ? "0 0 0 1px #EF4444" : undefined
+              }} 
+              placeholder="1-8" 
+              value={sem} 
+              onChange={(e) => {
+                setSem(e.target.value);
+                if (formErrors.sem) setFormErrors(prev => ({ ...prev, sem: "" }));
+              }} 
+            />
+            {formErrors.sem && (
+              <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.sem}</span>
+            )}
           </div>
           
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", flex: "1 1 260px" }}>
@@ -156,7 +236,13 @@ function AddCoursePage() {
         {loading ? (
           <p style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "20px" }}>Loading subjects...</p>
         ) : filteredCourses.length === 0 ? (
-          <div className="dash-card">No subjects found.</div>
+          <EmptyState 
+            icon={BookOpen}
+            title="No Subjects Found"
+            description={searchTerm ? "No subjects match your active search filter." : "No course subjects have been registered in this department yet."}
+            actionLabel="Add Subject"
+            onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          />
         ) : (
           <div className="dash-grid-3">
             {filteredCourses.map((c) => (
@@ -182,7 +268,8 @@ function AddCoursePage() {
                   <button 
                     className="btn btn-delete"
                     style={{ fontSize: "13px", padding: "6px 16px" }}
-                    onClick={() => handleDeleteCourse(c.course_code)}
+                    onClick={() => setCourseToDelete(c)}
+                    aria-label={`Remove subject ${c.course_name}`}
                   >
                     Remove
                   </button>
@@ -192,10 +279,10 @@ function AddCoursePage() {
           </div>
         )}
 
-        {/* EDIT SUBJECT MODAL */}
+        {/* EDIT SUBJECT MODAL (UIUX-009 Standardized Sizing) */}
         {editCourse && (
           <div className="glass-modal-overlay">
-            <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px" }}>
+            <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "520px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", padding: "28px" }}>
               <h3 className="title-medium" style={{ margin: 0 }}>Edit Subject</h3>
               <div className="flex-col gap-sm">
                 <label className="field-label">Subject Code (Read Only)</label>
@@ -216,6 +303,19 @@ function AddCoursePage() {
             </div>
           </div>
         )}
+
+        {/* CONFIRMATION MODAL FOR DESTRUCTIVE SUBJECT DELETION (UIUX-008) */}
+        <ConfirmModal
+          isOpen={!!courseToDelete}
+          onClose={() => setCourseToDelete(null)}
+          onConfirm={confirmDeleteCourse}
+          title="Remove Course Subject"
+          message={`Are you sure you want to remove ${courseToDelete?.course_name} (${courseToDelete?.course_code})?`}
+          subtext="Faculty assignments and feedback linked to this course code will be impacted."
+          confirmText="Yes, Remove Subject"
+          isDestructive={true}
+          isLoading={isDeleting}
+        />
 
       </div>
 

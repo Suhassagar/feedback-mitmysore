@@ -28,7 +28,7 @@ export default function AdminMainDashboard() {
     totalStudents: 0,
     totalFaculty: 0,
     activeSessions: 0,
-    globalRating: "0.0",
+    globalRating: "0.00",
     completionRate: "0.0"
   });
   
@@ -112,7 +112,7 @@ export default function AdminMainDashboard() {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: "#6B7280", fontSize: 12}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: "#6B7280", fontSize: 12}} />
                 <Tooltip />
-                <Area type="monotone" dataKey="uv" stroke="#3B82F6" fill="#EFF6FF" strokeWidth={3} />
+                <Area type="monotone" dataKey="uv" stroke="#16A34A" fill="#F0FDF4" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

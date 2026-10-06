@@ -5,12 +5,15 @@ import { toast } from "react-hot-toast";
 import PageTransition from "../components/PageTransition";
 import { ArrowLeft } from "lucide-react";
 import { useDepartmentName } from "../hooks/useDepartmentName";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 function DepartmentPage() {
   const { dept_id } = useParams();
   const deptName = useDepartmentName(dept_id);
   const [faculties, setFaculties] = useState([]);
   const [facultyAssignments, setFacultyAssignments] = useState({});
+  const [facultyToDelete, setFacultyToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   // ---------- POPUP STATES ----------
@@ -79,12 +82,23 @@ function DepartmentPage() {
     }
   };
 
-  const handleDeleteFaculty = async (faculty_id) => {
-    if (!window.confirm("Delete this faculty member?")) return;
+  const handleDeleteFaculty = (faculty) => {
+    setFacultyToDelete(faculty);
+  };
+
+  const confirmDeleteFaculty = async () => {
+    if (!facultyToDelete) return;
+    setIsDeleting(true);
     try {
-      await apiClient.delete(`/faculty/${faculty_id}`);
+      await apiClient.delete(`/faculty/${facultyToDelete.faculty_id}`);
+      toast.success("Faculty member deleted successfully");
+      setFacultyToDelete(null);
       loadFaculty();
-    } catch (err) { toast.error("Error deleting"); }
+    } catch (err) {
+      toast.error("Error deleting faculty");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleUpdateFaculty = async () => {
@@ -178,7 +192,7 @@ function DepartmentPage() {
                     <button className="btn btn-edit" onClick={() => setEditFaculty(f)}>
                       Edit
                     </button>
-                    <button className="btn btn-delete" onClick={() => handleDeleteFaculty(f.faculty_id)}>
+                    <button className="btn btn-delete" onClick={() => handleDeleteFaculty(f)}>
                       Delete
                     </button>
                   </div>
@@ -246,6 +260,19 @@ function DepartmentPage() {
           </div>
         </div>
       )}
+
+      {/* CONFIRMATION MODAL FOR FACULTY DELETION */}
+      <ConfirmModal
+        isOpen={!!facultyToDelete}
+        onClose={() => setFacultyToDelete(null)}
+        onConfirm={confirmDeleteFaculty}
+        title="Delete Faculty Member"
+        message={`Are you sure you want to delete faculty member ${facultyToDelete?.name} (${facultyToDelete?.faculty_id})?`}
+        subtext="All assignments and course linkages for this faculty member will be removed."
+        confirmText="Yes, Delete"
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
       </div>
     </PageTransition>
   );

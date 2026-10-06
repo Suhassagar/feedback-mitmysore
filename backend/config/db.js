@@ -136,8 +136,29 @@ async function ensurePerformanceIndexes() {
         }
       });
     }
+
+    const deptExists = await db.schema.hasTable('department');
+    if (deptExists) {
+      await db.schema.hasColumn('department', 'feedback_min_time_sec').then(async exists => {
+        if (!exists) {
+          await db.schema.table('department', t => t.integer('feedback_min_time_sec').defaultTo(300));
+          console.log('✅ Added missing feedback_min_time_sec column to department table');
+        }
+      });
+
+      const hasLogo = await db.schema.hasColumn('department', 'logo_url');
+      if (!hasLogo) {
+        await db.schema.table('department', t => {
+          t.string('logo_url', 500).nullable();
+          t.string('brand_color', 24).nullable().defaultTo('#2563EB');
+          t.string('brand_accent', 24).nullable().defaultTo('#1E40AF');
+          t.text('logo_lqip').nullable();
+        });
+        console.log('✅ Added logo_url, brand_color, brand_accent, and logo_lqip columns to department table');
+      }
+    }
   } catch (err) {
-    // Non-blocking background verification
+    console.error('ensurePerformanceIndexes error:', err.message);
   }
 }
 ensurePerformanceIndexes();

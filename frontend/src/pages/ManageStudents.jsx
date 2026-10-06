@@ -10,6 +10,8 @@ import {
 import BulkUploadModal from "../components/BulkUploadModal";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDepartmentName } from "../hooks/useDepartmentName";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import EmptyState from "../components/ui/EmptyState";
 
 function ManageStudents() {
   const { dept_id } = useParams();
@@ -25,7 +27,12 @@ function ManageStudents() {
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentEmail, setNewStudentEmail] = useState("");
   const [newStudentSection, setNewStudentSection] = useState("");
+  const [formErrors, setFormErrors] = useState({});
   
+  // Destructive Action Modal State (UIUX-008)
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'single', usn, name } | { type: 'bulk', count }
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Navigation & filtering states
   const [selectedSem, setSelectedSem] = useState(null);
   const [selectedStudents, setSelectedStudents] = useState([]);
@@ -37,6 +44,7 @@ function ManageStudents() {
     setSelectedStudents([]);
     setSearchTerm("");
     setSelectedSectionFilter("all");
+    setFormErrors({});
   }, [selectedSem]);
 
   useEffect(() => {
@@ -56,9 +64,18 @@ function ManageStudents() {
     }
   };
 
+  const validateStudentForm = () => {
+    const errors = {};
+    if (!newStudentUsn.trim()) errors.usn = "USN is required";
+    if (!newStudentSection.trim()) errors.section = "Section is required";
+    if (!newStudentName.trim()) errors.name = "Full name is required";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAddSingleStudent = async () => {
-    if (!newStudentUsn.trim() || !newStudentName.trim() || !newStudentSection.trim()) {
-      return toast.error("Please fill USN, Name, and Section");
+    if (!validateStudentForm()) {
+      return toast.error("Please fill in the required fields highlighted in red");
     }
     
     try {
@@ -85,6 +102,7 @@ function ManageStudents() {
       setNewStudentName("");
       setNewStudentEmail("");
       setNewStudentSection("");
+      setFormErrors({});
       fetchStudents();
       if (loadAnalytics) loadAnalytics();
     } catch (err) {
@@ -135,31 +153,27 @@ function ManageStudents() {
     );
   };
 
-  const handleDeleteStudent = async (usn) => {
-    if (!window.confirm("Are you sure you want to delete this student?")) return;
+  const executeDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await apiClient.delete(`/students/${encodeURIComponent(usn)}`, { withCredentials: true });
-      toast.success("Student deleted successfully");
-      setSelectedStudents(prev => prev.filter(id => id !== usn));
+      setIsDeleting(true);
+      if (deleteTarget.type === 'single') {
+        await apiClient.delete(`/students/${encodeURIComponent(deleteTarget.usn)}`, { withCredentials: true });
+        toast.success(`Student ${deleteTarget.usn} deleted successfully`);
+        setSelectedStudents(prev => prev.filter(id => id !== deleteTarget.usn));
+      } else if (deleteTarget.type === 'bulk') {
+        await apiClient.post(`/students/bulk-delete`, { usns: selectedStudents }, { withCredentials: true });
+        toast.success(`${selectedStudents.length} students deleted successfully`);
+        setSelectedStudents([]);
+      }
+      setDeleteTarget(null);
       fetchStudents();
       if (loadAnalytics) loadAnalytics();
     } catch (err) {
       console.error(err);
-      toast.error("Error deleting student");
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete ${selectedStudents.length} selected students?`)) return;
-    try {
-      await apiClient.post(`/students/bulk-delete`, { usns: selectedStudents }, { withCredentials: true });
-      toast.success(`${selectedStudents.length} students deleted successfully`);
-      setSelectedStudents([]);
-      fetchStudents();
-      if (loadAnalytics) loadAnalytics();
-    } catch (err) {
-      console.error(err);
-      toast.error("Error deleting students in bulk");
+      toast.error(err.response?.data?.error || "Error deleting student(s)");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -524,11 +538,22 @@ function ManageStudents() {
                   <input 
                     type="text" 
                     className="form-input" 
-                    style={{ padding: "8px 12px", fontSize: "13px" }} 
+                    style={{ 
+                      padding: "8px 12px", 
+                      fontSize: "13px",
+                      borderColor: formErrors.usn ? "#EF4444" : undefined,
+                      boxShadow: formErrors.usn ? "0 0 0 1px #EF4444" : undefined
+                    }} 
                     placeholder="e.g. 4MH21CS001" 
                     value={newStudentUsn} 
-                    onChange={(e) => setNewStudentUsn(e.target.value.toUpperCase())} 
+                    onChange={(e) => {
+                      setNewStudentUsn(e.target.value.toUpperCase());
+                      if (formErrors.usn) setFormErrors(prev => ({ ...prev, usn: "" }));
+                    }} 
                   />
+                  {formErrors.usn && (
+                    <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.usn}</span>
+                  )}
                 </div>
 
                 <div className="col-section flex-col gap-sm" style={{ flex: "0 1 90px", minWidth: "70px" }}>
@@ -536,11 +561,22 @@ function ManageStudents() {
                   <input 
                     type="text" 
                     className="form-input" 
-                    style={{ padding: "8px 12px", fontSize: "13px" }} 
+                    style={{ 
+                      padding: "8px 12px", 
+                      fontSize: "13px",
+                      borderColor: formErrors.section ? "#EF4444" : undefined,
+                      boxShadow: formErrors.section ? "0 0 0 1px #EF4444" : undefined
+                    }} 
                     placeholder="A, B..." 
                     value={newStudentSection} 
-                    onChange={(e) => setNewStudentSection(e.target.value.toUpperCase())} 
+                    onChange={(e) => {
+                      setNewStudentSection(e.target.value.toUpperCase());
+                      if (formErrors.section) setFormErrors(prev => ({ ...prev, section: "" }));
+                    }} 
                   />
+                  {formErrors.section && (
+                    <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.section}</span>
+                  )}
                 </div>
                 
                 <div className="col-name flex-col gap-sm" style={{ flex: "2 1 170px", minWidth: "150px" }}>
@@ -548,11 +584,22 @@ function ManageStudents() {
                   <input 
                     type="text" 
                     className="form-input" 
-                    style={{ padding: "8px 12px", fontSize: "13px" }} 
+                    style={{ 
+                      padding: "8px 12px", 
+                      fontSize: "13px",
+                      borderColor: formErrors.name ? "#EF4444" : undefined,
+                      boxShadow: formErrors.name ? "0 0 0 1px #EF4444" : undefined
+                    }} 
                     placeholder="e.g. Rahul Sharma" 
                     value={newStudentName} 
-                    onChange={(e) => setNewStudentName(e.target.value)} 
+                    onChange={(e) => {
+                      setNewStudentName(e.target.value);
+                      if (formErrors.name) setFormErrors(prev => ({ ...prev, name: "" }));
+                    }} 
                   />
+                  {formErrors.name && (
+                    <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.name}</span>
+                  )}
                 </div>
 
                 <div className="col-email flex-col gap-sm" style={{ flex: "2 1 180px", minWidth: "160px" }}>
@@ -686,7 +733,7 @@ function ManageStudents() {
                   <button 
                     className="btn btn-delete" 
                     style={{ padding: "5px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
-                    onClick={handleBulkDelete}
+                    onClick={() => setDeleteTarget({ type: 'bulk', count: selectedStudents.length })}
                   >
                     <Trash2 size={14} /> Delete Selected
                   </button>
@@ -700,19 +747,21 @@ function ManageStudents() {
               {loading ? (
                 <div className="skeleton" style={{ height: "220px", width: "100%" }}></div>
               ) : filteredStudents.length === 0 ? (
-                <div style={{ padding: "36px 16px", textAlign: "center", color: "var(--text-secondary)" }}>
-                  <Users size={36} color="var(--text-secondary)" style={{ opacity: 0.5, marginBottom: "10px" }} />
-                  <h4 style={{ margin: "0 0 4px 0", color: "var(--text-primary)", fontSize: "15px" }}>No Students Found</h4>
-                  <p style={{ margin: 0, fontSize: "13px" }}>
-                    {searchTerm || selectedSectionFilter !== "all" 
-                      ? "No students match your active filters." 
-                      : `No registered students in Semester ${selectedSem}. Add them above or click Bulk Excel.`}
-                  </p>
-                </div>
+                <EmptyState 
+                  icon={Users}
+                  title="No Students Found"
+                  description={
+                    searchTerm || selectedSectionFilter !== "all" 
+                      ? "No students match your active filters. Try searching by another name or USN." 
+                      : `No registered students in Semester ${selectedSem}. Add them using the form above or bulk import via Excel.`
+                  }
+                  actionLabel="Bulk Excel Import"
+                  onAction={() => setShowBulkModal(true)}
+                />
               ) : (
                 <>
                   {/* 1. DESKTOP TABLE VIEW (Visible on >= 768px) */}
-                  <div className="student-desktop-view" style={{ overflowX: "auto" }}>
+                  <div className="student-desktop-view table-responsive-wrapper">
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
                       <thead>
                         <tr style={{ backgroundColor: "var(--hover-bg)", borderBottom: "1px solid var(--border-color)" }}>
@@ -774,8 +823,9 @@ function ManageStudents() {
                                 <button 
                                   className="btn btn-delete" 
                                   style={{ padding: "6px", height: "30px", width: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }} 
-                                  onClick={() => handleDeleteStudent(s.usn)} 
+                                  onClick={() => setDeleteTarget({ type: 'single', usn: s.usn, name: s.name })} 
                                   title="Delete Student"
+                                  aria-label={`Delete student ${s.name}`}
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -853,9 +903,10 @@ function ManageStudents() {
                             style={{ padding: "6px", height: "32px", width: "32px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", flexShrink: 0 }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteStudent(s.usn);
+                              setDeleteTarget({ type: 'single', usn: s.usn, name: s.name });
                             }}
                             title="Delete Student"
+                            aria-label={`Delete student ${s.name}`}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -869,6 +920,23 @@ function ManageStudents() {
           </>
         )}
       </div>
+
+      {/* CONFIRMATION MODAL FOR DELETING STUDENTS (UIUX-008) */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={executeDelete}
+        title={deleteTarget?.type === 'bulk' ? "Delete Selected Students" : "Delete Student"}
+        message={
+          deleteTarget?.type === 'bulk' 
+            ? `Are you sure you want to permanently delete all ${deleteTarget.count} selected students?` 
+            : `Are you sure you want to delete student ${deleteTarget?.name ? `${deleteTarget.name} (${deleteTarget.usn})` : deleteTarget?.usn}?`
+        }
+        subtext="This action cannot be undone. Enrolled records and pending evaluation entries for these student(s) will be permanently deleted."
+        confirmText={deleteTarget?.type === 'bulk' ? "Delete All Selected" : "Yes, Delete Student"}
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
 
       {showBulkModal && (
         <BulkUploadModal 

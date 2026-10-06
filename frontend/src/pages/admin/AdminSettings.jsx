@@ -120,7 +120,7 @@ export default function AdminSettings() {
               className="action-card-hover"
             >
               <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "#EFF6FF", color: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "#F0FDF4", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Key size={24} />
                 </div>
                 <div>
@@ -154,7 +154,7 @@ export default function AdminSettings() {
           {/* Security Information Panel */}
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ background: "linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)", borderRadius: "16px", border: "1px solid #E2E8F0", padding: "30px" }}>
-              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#DBEAFE", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
+              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#F0FDF4", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
                 <Shield size={20} />
               </div>
               <h3 style={{ margin: "0 0 12px 0", fontSize: "18px", color: "var(--navy)", fontWeight: "700" }}>Enterprise Security</h3>
@@ -196,7 +196,7 @@ export default function AdminSettings() {
               </button>
               
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
-                <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#EFF6FF", color: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#F0FDF4", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Key size={20} />
                 </div>
                 <h2 style={{ margin: 0, fontSize: "18px", color: "var(--navy)", fontWeight: "600" }}>Update Password</h2>
@@ -376,7 +376,7 @@ export default function AdminSettings() {
       <style>{`
         .action-card-hover:hover {
           transform: translateY(-2px);
-          border-color: #BFDBFE !important;
+          border-color: #BBF7D0 !important;
           box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
         }
       `}</style>
