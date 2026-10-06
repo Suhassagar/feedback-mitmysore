@@ -4,13 +4,14 @@ import { useNavigate, useParams, useOutletContext } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
   Calendar, Users, GraduationCap, BookOpen, BarChart3,
-  Plus, CheckCircle, AlertTriangle, Bell, LogOut, Star
+  Plus, CheckCircle, AlertTriangle, Bell, LogOut, Star, Download
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useFaculties } from "../hooks/useFaculties";
 import { useSessions } from "../hooks/useSessions";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDepartmentName } from "../hooks/useDepartmentName";
+import DepartmentExportModal from "../components/DepartmentExportModal";
 
 export default function DepartmentDashboard() {
   const { dept_id } = useParams();
@@ -23,6 +24,9 @@ export default function DepartmentDashboard() {
 
   // Note: setShowAddFacultyBox was passed via context, let's just navigate to manage-faculty instead for now
   const setShowAddFacultyBox = () => navigate(`/manage-faculty/${dept_id}`);
+
+  // Export Reports Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Create Session Modal State
   const [showCreateSessionModal, setShowCreateSessionModal] = useState(false);
@@ -83,11 +87,46 @@ export default function DepartmentDashboard() {
   return (
     <>
       {/* Welcome Section */}
-      <div>
-        <h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 8px 0", color: "var(--text-primary)" }}>
-          Welcome back, Department of {deptName || dept_id}
-        </h1>
-        <p style={{ color: "var(--text-secondary)", margin: 0, fontSize: "15px" }}>Manage your department's feedback and performance from one place.</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "20px" }}>
+        <div>
+          <h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 8px 0", color: "var(--text-primary)" }}>
+            Welcome back, Department of {deptName || dept_id}
+          </h1>
+          <p style={{ color: "var(--text-secondary)", margin: 0, fontSize: "15px" }}>Manage your department's feedback and performance from one place.</p>
+        </div>
+        <div>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="btn hoverable"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              height: "42px",
+              padding: "0 18px",
+              borderRadius: "10px",
+              background: "var(--card-bg, #ffffff)",
+              border: "1px solid var(--border-color, #E2E8F0)",
+              color: "var(--text-primary, #0F172A)",
+              fontWeight: "600",
+              fontSize: "13.5px",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+              cursor: "pointer",
+              transition: "all 0.2s ease"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "#94A3B8";
+              e.currentTarget.style.background = "#F8FAFC";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "var(--border-color, #E2E8F0)";
+              e.currentTarget.style.background = "var(--card-bg, #ffffff)";
+            }}
+          >
+            <Download size={16} color="#475569" />
+            <span>Export Reports</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Statistics */}
@@ -176,7 +215,11 @@ export default function DepartmentDashboard() {
             <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>No faculty data available.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, justifyContent: "center" }}>
-              {[...faculties].sort((a, b) => b.avgRating - a.avgRating).slice(0, 3).map((f, index) => (
+              {[...faculties].sort((a, b) => {
+                const valA = a.avgRating === "N/A" || !a.avgRating ? -1 : parseFloat(a.avgRating);
+                const valB = b.avgRating === "N/A" || !b.avgRating ? -1 : parseFloat(b.avgRating);
+                return valB - valA;
+              }).slice(0, 3).map((f, index) => (
                 <div key={f.faculty_id} onClick={() => navigate(`/manage-faculty/${dept_id}?faculty_id=${f.faculty_id}`)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", background: "var(--bg-light)", borderRadius: "12px", border: "1px solid var(--border-color)", cursor: "pointer", transition: "transform 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                     <div style={{
@@ -319,6 +362,16 @@ export default function DepartmentDashboard() {
           </div>
         </div>
       )}
+
+      {/* Academic Feedback Reports Export Modal */}
+      <DepartmentExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        dept_id={dept_id}
+        deptName={deptName}
+        analytics={analytics}
+        faculties={faculties}
+      />
     </>
   );
 }

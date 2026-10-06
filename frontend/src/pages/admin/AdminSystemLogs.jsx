@@ -117,8 +117,8 @@ export default function AdminSystemLogs() {
 
   const getLevelBadge = (module, action = "", status = "") => {
     let level = "INFO";
-    let color = "#2563EB";
-    let bg = "#EFF6FF";
+    let color = "#16A34A";
+    let bg = "#F0FDF4";
 
     if (status === 'failed' || action.toLowerCase().includes('fail') || action.toLowerCase().includes('error')) {
       level = "ERROR"; color = "#DC2626"; bg = "#FEF2F2";
@@ -158,7 +158,7 @@ export default function AdminSystemLogs() {
       {/* KPI Cards Grid */}
       <div className="dash-grid-4">
         <div className="card" style={{ padding: "18px 20px", display: "flex", gap: "14px", alignItems: "center" }}>
-          <div style={{ background: "#EFF6FF", padding: "10px", borderRadius: "8px", color: "#2563EB" }}>
+          <div style={{ background: "#F0FDF4", padding: "10px", borderRadius: "8px", color: "#16A34A" }}>
             <Activity size={22}/>
           </div>
           <div>

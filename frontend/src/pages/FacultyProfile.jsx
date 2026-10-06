@@ -5,6 +5,8 @@ import apiClient from "../services/apiClient";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
+import EmptyState from "../components/ui/EmptyState";
+
 export default function FacultyProfile() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -36,7 +38,34 @@ export default function FacultyProfile() {
   }, [user?.faculty_id]);
 
   if (loading) {
-    return <div style={{ padding: '40px' }}><h2>Loading Profile...</h2></div>;
+    return (
+      <div className="theme-faculty fade-in" style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
+        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', border: '1px solid #E2E8F0', marginBottom: '24px' }}>
+          <div className="skeleton" style={{ height: '120px', width: '100%', borderRadius: 0 }} />
+          <div style={{ padding: '0 24px 24px 24px', marginTop: '-40px', display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
+            <div className="skeleton" style={{ width: '120px', height: '120px', borderRadius: '50%', border: '4px solid white' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '20px', flex: 1 }}>
+              <div className="skeleton" style={{ width: '220px', height: '28px' }} />
+              <div className="skeleton" style={{ width: '160px', height: '16px' }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ background: 'white', borderRadius: '16px', padding: '32px', border: '1px solid #E2E8F0' }}>
+          <div className="skeleton" style={{ width: '180px', height: '24px', marginBottom: '24px' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '10px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                  <div className="skeleton" style={{ width: '80px', height: '12px' }} />
+                  <div className="skeleton" style={{ width: '140px', height: '16px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const handleDrag = (e) => {
@@ -155,7 +184,17 @@ export default function FacultyProfile() {
   };
 
   if (!profile) {
-    return <div style={{ padding: '40px' }}><h2>Profile not found</h2></div>;
+    return (
+      <div style={{ padding: '60px 24px', maxWidth: '600px', margin: '0 auto' }}>
+        <EmptyState
+          icon={User}
+          title="Faculty Profile Not Found"
+          description="Could not locate profile details for this account. Please verify credentials or contact your department administrator."
+          actionText="Go to Dashboard"
+          onAction={() => navigate('/faculty-dashboard')}
+        />
+      </div>
+    );
   }
 
   return (

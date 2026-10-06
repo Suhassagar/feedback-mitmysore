@@ -32,18 +32,20 @@ function decrypt(text) {
   }
 }
 
+const { processAndUploadLogo } = require('../utils/imageProcessor');
+
 const getDepartments = async (req, res) => {
   try {
     const rows = await db('department')
       .where({ is_active: true })
-      .select('dept_id', 'dept_name', 'is_active');
+      .select('dept_id', 'dept_name', 'is_active', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip');
     return res.json(rows);
   } catch (err) {
     console.warn("[getDepartments] Connection error on first attempt, retrying with fresh connection...", err.message);
     try {
       const retryRows = await db('department')
         .where({ is_active: true })
-        .select('dept_id', 'dept_name', 'is_active');
+        .select('dept_id', 'dept_name', 'is_active', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip');
       return res.json(retryRows);
     } catch (retryErr) {
       console.error("[getDepartments FATAL]:", retryErr.message);
@@ -59,17 +61,96 @@ const addDepartment = async (req, res) => {
   if (username) username = username.toLowerCase();
   
   const pwd = password || "Dept@123";
+
+  let logoData = {
+    logo_url: null,
+    logo_lqip: null
+  };
+
+  // If a logo file was uploaded with the multipart request
+  if (req.file) {
+    try {
+      const processed = await processAndUploadLogo(req.file.buffer, dept_id || 'DEPT');
+      logoData = {
+        logo_url: processed.logo_url,
+        logo_lqip: processed.logo_lqip
+      };
+    } catch (procErr) {
+      console.warn("Logo processing warning during addDepartment:", procErr.message);
+    }
+  }
+
   const trx = await db.transaction();
   try {
     const hashedPassword = await bcrypt.hash(pwd, 10);
-    await trx('department').insert({ dept_id, dept_name, username, password: hashedPassword });
+    await trx('department').insert({ 
+      dept_id, 
+      dept_name, 
+      username, 
+      password: hashedPassword,
+      logo_url: logoData.logo_url,
+      logo_lqip: logoData.logo_lqip
+    });
     
     await trx.commit();
-    res.json({ success: true, message: "Department created successfully" });
+    res.json({ 
+      success: true, 
+      message: "Department created successfully",
+      dept: {
+        dept_id,
+        dept_name,
+        username,
+        ...logoData
+      }
+    });
   } catch (err) {
     await trx.rollback();
     console.error("Department add error:", err);
     res.json({ success: false, message: err.code === 'ER_DUP_ENTRY' ? "Department ID or Username already exists" : "Database Error" });
+  }
+};
+
+const updateDepartmentLogo = async (req, res) => {
+  let { dept_id } = req.params;
+  if (!dept_id) return res.status(400).json({ success: false, message: "Department ID is required" });
+  dept_id = dept_id.toUpperCase();
+
+  // If role is department, ensure they are modifying their own department
+  if (req.session.role === 'department' && req.session.dept_id.toUpperCase() !== dept_id) {
+    return res.status(403).json({ success: false, message: "Unauthorized to update another department's logo" });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "No logo file provided" });
+  }
+
+  try {
+    const existing = await db('department').where({ dept_id }).first();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Department not found" });
+    }
+
+    const processed = await processAndUploadLogo(req.file.buffer, dept_id, existing.logo_url);
+
+    await db('department').where({ dept_id }).update({
+      logo_url: processed.logo_url,
+      logo_lqip: processed.logo_lqip
+    });
+
+    // Update active session if it's the current user's department
+    if (req.session.dept_id && req.session.dept_id.toUpperCase() === dept_id) {
+      req.session.logo_url = processed.logo_url;
+      req.session.logo_lqip = processed.logo_lqip;
+    }
+
+    return res.json({
+      success: true,
+      message: "Department logo updated successfully",
+      ...processed
+    });
+  } catch (err) {
+    console.error("updateDepartmentLogo error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Failed to process logo" });
   }
 };
 
@@ -106,13 +187,21 @@ const getFacultyByDept = async (req, res) => {
   if (dept_id) dept_id = dept_id.toUpperCase();
   try {
     const rows = await db('global_faculty as f')
-      .leftJoin('global_assign as a', 'f.faculty_id', 'a.faculty_id')
       .where({ 'f.dept_id': dept_id, 'f.is_active': true })
-      .select('f.faculty_id', 'f.name', 'f.email', 'f.position', 'f.dob', 'f.joining_date')
-      .count('a.course_code as totalSubjects')
-      .groupBy('f.faculty_id', 'f.name', 'f.email', 'f.position', 'f.dob', 'f.joining_date');
+      .select(
+        'f.faculty_id',
+        'f.name',
+        'f.email',
+        'f.position',
+        'f.dob',
+        'f.joining_date',
+        db.raw('(SELECT COUNT(DISTINCT a.course_code) FROM global_assign a WHERE a.faculty_id = f.faculty_id AND a.dept_id = f.dept_id) as totalSubjects'),
+        db.raw('(SELECT ROUND(COALESCE(AVG(sf.rating), 0), 2) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id AND sf.is_genuine = 1) as avg_rating'),
+        db.raw('(SELECT COUNT(sf.rating) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id AND sf.is_genuine = 1) as total_feedback')
+      );
     res.json(rows);
   } catch (err) {
+    console.error("Error fetching faculty by dept:", err);
     res.status(500).json({ error: "DB error" });
   }
 };
@@ -331,7 +420,7 @@ const getFacultyAssignedSubjects = async (req, res) => {
       .where({ 'a.faculty_id': faculty_id, 'a.dept_id': dept_id })
       .select(
         'a.course_code', 'c.course_id', 'c.course_name', 'a.sem', 'a.section',
-        db.raw(`(SELECT AVG(sf.rating) FROM global_student_feedback sf WHERE sf.faculty_id = a.faculty_id AND sf.course_id = a.course_code AND sf.dept_id = ?) as avg_rating`, [dept_id])
+        db.raw(`(SELECT ROUND(COALESCE(AVG(sf.rating), 0), 2) FROM global_student_feedback sf WHERE sf.faculty_id = a.faculty_id AND sf.course_id = a.course_code AND sf.dept_id = ? AND sf.is_genuine = 1) as avg_rating`, [dept_id])
       );
     res.json(rows);
   } catch (err) {
@@ -339,8 +428,55 @@ const getFacultyAssignedSubjects = async (req, res) => {
   }
 };
 
+const getDepartmentTiming = async (req, res) => {
+  let { dept_id } = req.params;
+  if (dept_id) dept_id = dept_id.toUpperCase();
+  try {
+    const dept = await db('department').where({ dept_id }).first();
+    if (!dept) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+    const min_time_sec = dept.feedback_min_time_sec != null ? Number(dept.feedback_min_time_sec) : 300;
+    res.json({
+      dept_id,
+      min_time_sec,
+      is_timer_enabled: min_time_sec > 0
+    });
+  } catch (err) {
+    console.error("Error fetching department timing:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+};
+
+const updateDepartmentTiming = async (req, res) => {
+  let { dept_id } = req.params;
+  let { min_time_sec } = req.body;
+  if (dept_id) dept_id = dept_id.toUpperCase();
+
+  min_time_sec = parseInt(min_time_sec, 10);
+  if (isNaN(min_time_sec) || min_time_sec < 0 || min_time_sec > 1800) {
+    return res.status(400).json({ error: "Invalid duration. Duration must be between 0 and 1800 seconds (30 minutes)." });
+  }
+
+  try {
+    await db('department').where({ dept_id }).update({ feedback_min_time_sec: min_time_sec });
+    await logActivity(req, dept_id, 'UPDATE', 'SETTINGS', `Updated feedback form submission dwell timer to ${min_time_sec} seconds`);
+    res.json({
+      success: true,
+      dept_id,
+      min_time_sec,
+      is_timer_enabled: min_time_sec > 0,
+      message: "Submission timer updated successfully"
+    });
+  } catch (err) {
+    console.error("Error updating department timing:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+};
+
 module.exports = {
-  getDepartments, addDepartment, addCourse, getCourses, getFacultyByDept,
+  getDepartments, addDepartment, updateDepartmentLogo, addCourse, getCourses, getFacultyByDept,
   assignSubject, getFacultyAssignments, getNotes, addNote, getNotifications,
-  markNotificationRead, bulkUploadStudents, globalSearch, removeFacultyAssignment, getFacultyAssignedSubjects
+  markNotificationRead, bulkUploadStudents, globalSearch, removeFacultyAssignment, getFacultyAssignedSubjects,
+  getDepartmentTiming, updateDepartmentTiming
 };

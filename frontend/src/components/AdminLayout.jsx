@@ -3,6 +3,7 @@ import apiClient from "../services/apiClient";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import PageTransition from "./PageTransition";
 import { useAuth } from "../context/AuthContext";
+import CopilotWidget from "./copilot/CopilotWidget";
 import { 
   LayoutDashboard, Building, Users, GraduationCap, 
   Calendar, BarChart3, FileText, Settings, LogOut, 
@@ -27,17 +28,25 @@ export default function AdminLayout() {
 
   return (
     <PageTransition>
-      <div className="dashboard-layout department-theme" style={{ '--sidebar-bg': '#0B1120' }}>
+      <div className="dashboard-layout theme-admin admin-theme" style={{ '--sidebar-bg': '#062E1B' }}>
         
         <div className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
         
         {/* ================= SIDEBAR ================= */}
-        <aside className={`dashboard-sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`} style={{ background: "var(--sidebar-bg)", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
-          <div className="sidebar-logo">
-            <img src="/logo.jpeg" alt="Logo" />
+        <aside className={`dashboard-sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`} style={{ background: "#062E1B", borderRight: "1px solid rgba(16, 185, 129, 0.15)" }}>
+          <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "24px" }}>
+            <div style={{ 
+              width: '44px', height: '44px', borderRadius: '50%', 
+              background: '#fff', display: 'flex', 
+              alignItems: 'center', justifyContent: 'center', 
+              overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
+              flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            }}>
+              <img src="/logo.jpeg" alt="College Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+            </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: "16px", fontWeight: "bold", letterSpacing: "1px" }}>MIT MYSORE</span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>Feedback System</span>
+              <span style={{ fontSize: "16px", fontWeight: "800", color: "#FFFFFF", letterSpacing: "1px", whiteSpace: "nowrap" }}>MIT MYSORE</span>
+              <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: "500", marginTop: "1px" }}>Central Admin Portal</span>
             </div>
           </div>
 
@@ -118,6 +127,9 @@ export default function AdminLayout() {
         <main className="dashboard-main" style={{ background: "#F8FAFC", padding: "clamp(16px, 3vw, 30px)", overflowY: "auto", height: "calc(100vh - 70px)" }}>
           <Outlet />
         </main>
+
+        {/* Global SAGAR Copilot for Admin */}
+        <CopilotWidget />
       </div>
     </PageTransition>
   );

@@ -5,6 +5,7 @@ const { isAdminOrDepartment, isAdminOrDepartmentOrFaculty } = require('../middle
 const { sensitiveLimiter } = require('../middleware/rateLimiter');
 
 router.get('/feedback/token', feedbackController.generateToken);
+router.get('/feedback/timing/:session_id', feedbackController.getFeedbackTiming);
 router.get('/student/subjects/:session_id', feedbackController.getStudentSubjects);
 router.post('/submit-feedback', sensitiveLimiter, feedbackController.submitFeedback);
 

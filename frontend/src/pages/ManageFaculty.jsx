@@ -9,6 +9,8 @@ import PageTransition from "../components/PageTransition";
 import BulkUploadModal from "../components/BulkUploadModal";
 import FacultyProfile from "../features/faculty/components/FacultyProfile";
 import { useFaculties } from "../hooks/useFaculties";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function ManageFaculty() {
   const { dept_id } = useParams();
@@ -21,6 +23,11 @@ export default function ManageFaculty() {
   const [newFacultyName, setNewFacultyName] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [newFacultyEmail, setNewFacultyEmail] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+
+  // Destructive Delete State (UIUX-008)
+  const [facultyToDelete, setFacultyToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,22 +44,57 @@ export default function ManageFaculty() {
     }
   }, [location.search, faculties]);
 
-  const handleDeleteFaculty = async (faculty_id) => {
-    if (!window.confirm("Delete this faculty member?")) return;
+  const confirmDeleteFaculty = async () => {
+    if (!facultyToDelete) return;
     try {
-      await apiClient.delete(`/faculty/${faculty_id}`, { withCredentials: true });
+      setIsDeleting(true);
+      await apiClient.delete(`/faculty/${facultyToDelete.faculty_id}`, { withCredentials: true });
+      toast.success(`Faculty member ${facultyToDelete.name} deleted successfully`);
+      setFacultyToDelete(null);
+      if (selectedFaculty?.faculty_id === facultyToDelete.faculty_id) {
+        setSelectedFaculty(null);
+      }
       loadFaculties();
-    } catch (err) { toast.error("Error deleting"); }
+    } catch (err) { 
+      toast.error(err.response?.data?.error || "Error deleting faculty member"); 
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const validateFacultyForm = () => {
+    const errors = {};
+    if (!newFacultyId.trim()) errors.id = "Faculty ID is required";
+    if (!newFacultyName.trim()) errors.name = "Full name is required";
+    if (!newFacultyEmail.trim()) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newFacultyEmail.trim())) {
+      errors.email = "Valid email is required";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const addFaculty = async () => {
-    if (!newFacultyId || !newFacultyName || !newFacultyEmail) return toast.error("All fields required");
+    if (!validateFacultyForm()) {
+      return toast.error("Please fill in all required fields highlighted in red");
+    }
     try {
-      await apiClient.post("/faculty/add", { faculty_id: newFacultyId, name: newFacultyName, email: newFacultyEmail, dept_id }, { withCredentials: true });
-      toast.success("Faculty Added");
-      setNewFacultyId(""); setNewFacultyName(""); setNewFacultyEmail("");
+      await apiClient.post("/faculty/add", { 
+        faculty_id: newFacultyId.trim().toUpperCase(), 
+        name: newFacultyName.trim(), 
+        email: newFacultyEmail.trim().toLowerCase(), 
+        dept_id 
+      }, { withCredentials: true });
+      toast.success("Faculty Added successfully");
+      setNewFacultyId(""); 
+      setNewFacultyName(""); 
+      setNewFacultyEmail("");
+      setFormErrors({});
       loadFaculties();
-    } catch (err) { toast.error("Error adding faculty"); }
+    } catch (err) { 
+      toast.error(err.response?.data?.error || "Error adding faculty"); 
+    }
   };
 
   const filteredFaculties = faculties.filter(f => 
@@ -67,8 +109,23 @@ export default function ManageFaculty() {
           selectedFaculty={selectedFaculty}
           setSelectedFaculty={setSelectedFaculty}
           dept_id={dept_id}
-          handleDeleteFaculty={handleDeleteFaculty}
+          handleDeleteFaculty={(fid) => {
+            const fac = faculties.find(f => f.faculty_id === fid) || { faculty_id: fid, name: fid };
+            setFacultyToDelete(fac);
+          }}
           loadFaculties={loadFaculties}
+        />
+        {/* Modal if triggered from profile view */}
+        <ConfirmModal
+          isOpen={!!facultyToDelete}
+          onClose={() => setFacultyToDelete(null)}
+          onConfirm={confirmDeleteFaculty}
+          title="Delete Faculty Member"
+          message={`Are you sure you want to permanently delete faculty member "${facultyToDelete?.name}" (${facultyToDelete?.faculty_id})?`}
+          subtext="This action will permanently cascade and delete all subject assignments, evaluation results, and notes."
+          confirmText="Yes, Delete Faculty"
+          isDestructive={true}
+          isLoading={isDeleting}
         />
       </PageTransition>
     );
@@ -88,16 +145,67 @@ export default function ManageFaculty() {
         {/* INLINE ADD FACULTY PANEL */}
         <div className="card dash-grid-4" style={{ padding: "20px", marginBottom: "24px", alignItems: "flex-end" }}>
           <div className="flex-col gap-sm">
-            <label className="field-label" style={{ fontSize: "13px" }}>Faculty ID</label>
-            <input type="text" className="form-input" style={{ padding: "10px" }} placeholder="e.g. F123" value={newFacultyId} onChange={(e) => setNewFacultyId(e.target.value)} />
+            <label className="field-label" style={{ fontSize: "13px" }}>Faculty ID *</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ 
+                padding: "10px",
+                borderColor: formErrors.id ? "#EF4444" : undefined,
+                boxShadow: formErrors.id ? "0 0 0 1px #EF4444" : undefined
+              }} 
+              placeholder="e.g. F123" 
+              value={newFacultyId} 
+              onChange={(e) => {
+                setNewFacultyId(e.target.value);
+                if (formErrors.id) setFormErrors(prev => ({ ...prev, id: "" }));
+              }} 
+            />
+            {formErrors.id && (
+              <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.id}</span>
+            )}
           </div>
           <div className="flex-col gap-sm">
-            <label className="field-label" style={{ fontSize: "13px" }}>Full Name</label>
-            <input type="text" className="form-input" style={{ padding: "10px" }} placeholder="John Doe" value={newFacultyName} onChange={(e) => setNewFacultyName(e.target.value)} />
+            <label className="field-label" style={{ fontSize: "13px" }}>Full Name *</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ 
+                padding: "10px",
+                borderColor: formErrors.name ? "#EF4444" : undefined,
+                boxShadow: formErrors.name ? "0 0 0 1px #EF4444" : undefined
+              }} 
+              placeholder="John Doe" 
+              value={newFacultyName} 
+              onChange={(e) => {
+                setNewFacultyName(e.target.value);
+                if (formErrors.name) setFormErrors(prev => ({ ...prev, name: "" }));
+              }} 
+            />
+            {formErrors.name && (
+              <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.name}</span>
+            )}
           </div>
           <div className="flex-col gap-sm">
-            <label className="field-label" style={{ fontSize: "13px" }}>Email Address</label>
-            <input type="email" className="form-input" style={{ padding: "10px" }} placeholder="john@example.com" value={newFacultyEmail} onChange={(e) => setNewFacultyEmail(e.target.value)} />
+            <label className="field-label" style={{ fontSize: "13px" }}>Email Address *</label>
+            <input 
+              type="email" 
+              className="form-input" 
+              style={{ 
+                padding: "10px",
+                borderColor: formErrors.email ? "#EF4444" : undefined,
+                boxShadow: formErrors.email ? "0 0 0 1px #EF4444" : undefined
+              }} 
+              placeholder="john@example.com" 
+              value={newFacultyEmail} 
+              onChange={(e) => {
+                setNewFacultyEmail(e.target.value);
+                if (formErrors.email) setFormErrors(prev => ({ ...prev, email: "" }));
+              }} 
+            />
+            {formErrors.email && (
+              <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "600" }}>{formErrors.email}</span>
+            )}
           </div>
           <div style={{ display: "flex", gap: "12px", flexDirection: "column" }}>
             <button className="btn hoverable" style={{ padding: "10px 24px", whiteSpace: "nowrap", height: "42px", background: "var(--focus-ring)", color: "var(--primary)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontWeight: "600", width: "100%" }} onClick={addFaculty}>
@@ -120,7 +228,13 @@ export default function ManageFaculty() {
         </div>
         
         {filteredFaculties.length === 0 ? (
-          <div className="dash-card">No faculty found.</div>
+          <EmptyState 
+            icon={Users}
+            title="No Faculty Members Found"
+            description={searchTerm ? "No faculty members match your active search query." : "No faculty registered in this department yet. Add one above or import via Bulk Excel."}
+            actionLabel="Bulk Import Faculty"
+            onAction={() => setShowBulkModal(true)}
+          />
         ) : (
           <div className="dash-grid-3">
             {filteredFaculties.map((f) => (
@@ -203,6 +317,19 @@ export default function ManageFaculty() {
         )}
 
       </div>
+
+      {/* CONFIRMATION MODAL FOR DELETING FACULTY MEMBER (UIUX-008) */}
+      <ConfirmModal
+        isOpen={!!facultyToDelete}
+        onClose={() => setFacultyToDelete(null)}
+        onConfirm={confirmDeleteFaculty}
+        title="Delete Faculty Member"
+        message={`Are you sure you want to permanently delete faculty member "${facultyToDelete?.name}" (${facultyToDelete?.faculty_id})?`}
+        subtext="This action will permanently cascade and delete all subject assignments, evaluation results, and notes."
+        confirmText="Yes, Delete Faculty"
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
 
       {showBulkModal && (
         <BulkUploadModal 

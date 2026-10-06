@@ -75,51 +75,54 @@ const submitFeedback = async (req, res) => {
   
   const student = { usn, session_id: student_session_id, dept_id };
   
-  // Enforce 5-minute minimum dwell time
-  // MIN_TIME in milliseconds (5 minutes = 5 * 60 * 1000)
-  const MIN_TIME = 5 * 60 * 1000; 
-  if (req.session.feedback_start_time) {
-    const timeSpent = Date.now() - req.session.feedback_start_time;
-    if (timeSpent < MIN_TIME) {
-      const remainingSecs = Math.ceil((MIN_TIME - timeSpent) / 1000);
-      return res.status(400).json({ error: `Please take time to read and evaluate. You can submit in ${remainingSecs} seconds.` });
+  // Enforce department-configured minimum dwell time (if > 0)
+  const sessionRecord = await db('global_sessions').where({ session_id }).first();
+  const deptRecord = sessionRecord ? await db('department').where({ dept_id: sessionRecord.dept_id }).first() : null;
+  const minTimeSec = deptRecord?.feedback_min_time_sec != null ? Number(deptRecord.feedback_min_time_sec) : 300;
+
+  if (minTimeSec > 0) {
+    const minTimeMs = minTimeSec * 1000;
+    if (req.session.feedback_start_time) {
+      const timeSpent = Date.now() - req.session.feedback_start_time;
+      if (timeSpent < minTimeMs) {
+        const remainingSecs = Math.ceil((minTimeMs - timeSpent) / 1000);
+        return res.status(400).json({ error: `Please take time to read and evaluate. You can submit in ${remainingSecs} seconds.` });
+      }
+    } else {
+      // If somehow start time is missing, set it now and force them to wait
+      req.session.feedback_start_time = Date.now();
+      return res.status(400).json({ error: `Session timer restarted. Please review the feedback for ${Math.ceil(minTimeSec / 60)} minutes before submitting.` });
     }
-  } else {
-    // If somehow start time is missing, set it now and force them to wait
-    req.session.feedback_start_time = Date.now();
-    return res.status(400).json({ error: `Session timer restarted. Please review the feedback for 5 minutes before submitting.` });
   }
 
-  const trx = await db.transaction();
+  // =========================================================================
+  // ENHANCEMENT: Hybrid Asynchronous Ingestion (Peak-Load Protection)
+  // =========================================================================
+
   try {
-    // IDEMPOTENCY CHECK: Try to insert the token. If it already exists, it throws ER_DUP_ENTRY and aborts immediately.
+    // 1. IDEMPOTENCY CHECK: Extremely fast unique index constraint
     try {
-      await trx('global_used_tokens').insert({ token: idempotency_key });
+      await db('global_used_tokens').insert({ token: idempotency_key });
     } catch (tokenErr) {
       if (tokenErr.code === 'ER_DUP_ENTRY') {
-        throw new Error("Duplicate submission detected. Feedback already submitted.");
+        return res.status(403).json({ error: "Duplicate submission detected. Feedback already submitted." });
       }
       throw tokenErr;
     }
 
-    const dept_id = student.dept_id; // from login
+    const dept_id = student.dept_id;
 
-    // Lock the student row to prevent race conditions
-    const studentRow = await trx('global_students')
-      .where({ usn: student.usn, dept_id })
-      .select('feedback_given', 'session_id')
-      .forUpdate()
-      .first();
+    // 2. MICRO-SYNCHRONOUS LOCK: Update student status instantly without SELECT FOR UPDATE
+    const updateResult = await db('global_students')
+      .where({ usn: student.usn, dept_id, feedback_given: 'pending' })
+      .update({ session_id, feedback_given: 'done' });
 
-    if (!studentRow) {
-      throw new Error("Student record not found");
+    if (updateResult === 0) {
+      // Either student not found, or they already submitted
+      return res.status(403).json({ error: "Feedback already submitted or student not found" });
     }
 
-    if (studentRow.session_id === session_id && studentRow.feedback_given === "done") {
-      throw new Error("Feedback already submitted");
-    }
-
-    // Shadowban Variance Check
+    // 3. IN-MEMORY VALIDATION & STAGING (0 Database operations)
     const allRatings = [];
     for (const faculty of facultyList) {
       if (faculty.feedback) {
@@ -138,121 +141,145 @@ const submitFeedback = async (req, res) => {
       }
     }
 
-    // =========================================================================
-    // ENHANCEMENT: High-Performance Bulk Insertion & In-Memory Staging
-    // =========================================================================
     const ratingsToInsert = [];
     const facultyRemarksToInsert = [];
     const sectionRemarksToInsert = [];
+    const scorecardUpdatesToInsert = [];
 
-    // Phase 1: Fast in-memory validation and staging (0 DB queries)
     for (let i = 0; i < facultyList.length; i++) {
       const faculty = facultyList[i];
       if (!faculty.faculty_id || !faculty.course_id) {
-        throw new Error("Invalid faculty data");
+        // Rollback sync lock on failure
+        await db('global_students').where({ usn: student.usn, dept_id }).update({ session_id: null, feedback_given: 'pending' });
+        return res.status(400).json({ error: "Invalid faculty data" });
       }
 
       const feedback = faculty.feedback || {};
       const questionIds = Object.keys(feedback);
       
       if (questionIds.length === 0) {
-        throw new Error("No feedback ratings provided");
+        await db('global_students').where({ usn: student.usn, dept_id }).update({ session_id: null, feedback_given: 'pending' });
+        return res.status(400).json({ error: "No feedback ratings provided" });
       }
 
-      for (let qId of questionIds) {
-        const rawRating = feedback[qId];
-        const rating = Number(rawRating);
+      let sum = 0;
+      let genuineCount = isGenuine ? 1 : 0;
+      let excellent = 0, good = 0, average = 0, poor = 0;
 
-        // Fail-Fast: Strict integer validation (1 to 5)
+      for (let qId of questionIds) {
+        const rating = Number(feedback[qId]);
         if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-          throw new Error(`Invalid rating for question ${qId}. Must be between 1 and 5.`);
+          await db('global_students').where({ usn: student.usn, dept_id }).update({ session_id: null, feedback_given: 'pending' });
+          return res.status(400).json({ error: `Invalid rating for question ${qId}.` });
         }
 
         ratingsToInsert.push({
-          faculty_id: faculty.faculty_id,
-          course_id: faculty.course_id,
-          question_id: qId,
-          rating,
-          session_id,
-          dept_id,
-          is_genuine: isGenuine
+          faculty_id: faculty.faculty_id, course_id: faculty.course_id, question_id: qId,
+          rating, session_id, dept_id, is_genuine: isGenuine
         });
+
+        if (isGenuine) {
+          sum += rating;
+          if (rating >= 4.5) excellent++;
+          else if (rating >= 3.5) good++;
+          else if (rating >= 2.5) average++;
+          else poor++;
+        }
       }
 
-      // Stage faculty-specific remark if provided
+      scorecardUpdatesToInsert.push({
+        dept_id, faculty_id: faculty.faculty_id, course_id: faculty.course_id, session_id,
+        sum, count: questionIds.length, genuineCount, excellent, good, average, poor
+      });
+
       if (faculty.remark && typeof faculty.remark === 'string' && faculty.remark.trim() !== "") {
         facultyRemarksToInsert.push({
-          session_id,
-          dept_id,
-          faculty_id: faculty.faculty_id,
-          course_id: faculty.course_id,
-          remark_text: faculty.remark.trim()
+          session_id, dept_id, faculty_id: faculty.faculty_id,
+          course_id: faculty.course_id, remark_text: faculty.remark.trim()
         });
       }
 
-      // Stage section-specific remarks if provided
       if (faculty.section_remarks && typeof faculty.section_remarks === 'object') {
         for (const [section_heading, remark_text] of Object.entries(faculty.section_remarks)) {
           if (remark_text && typeof remark_text === 'string' && remark_text.trim() !== "") {
             sectionRemarksToInsert.push({
-              session_id,
-              dept_id,
-              faculty_id: faculty.faculty_id,
-              course_id: faculty.course_id,
-              section_heading,
-              remark_text: remark_text.trim()
+              session_id, dept_id, faculty_id: faculty.faculty_id,
+              course_id: faculty.course_id, section_heading, remark_text: remark_text.trim()
             });
           }
         }
       }
     }
 
-    // Phase 2: Vector Bulk Insert (Safe batching and empty payload checks)
-    if (ratingsToInsert.length > 0) {
-      await trx.batchInsert('global_student_feedback', ratingsToInsert, 100);
-    }
-
-    if (facultyRemarksToInsert.length > 0) {
-      await trx('global_faculty_remarks').insert(facultyRemarksToInsert);
-    }
-
-    if (sectionRemarksToInsert.length > 0) {
-      await trx('global_section_remarks').insert(sectionRemarksToInsert);
-    }
-
-    // Mark feedback as done for this student
-    await trx('global_students')
-      .where({ usn: student.usn, dept_id })
-      .update({ session_id, feedback_given: 'done' });
-    
-    // Save optional department remark anonymously
-    if (department_remark && department_remark.trim() !== "") {
-      await trx('global_session_remarks').insert({
-        session_id,
-        remark_text: department_remark.trim(),
-        dept_id
-      });
-    }
-    
-    const sessRow = await trx('global_sessions').where({ session_id, dept_id }).first();
-
-    await trx.commit();
-    
-    // In actual production, emit socket event here. Assuming we can get io from somewhere, 
-    // or just let the socket logic handle it via a global app variable if needed.
-    const io = req.app.get('io');
-    if (io) {
-      io.emit("NEW_FEEDBACK_RECEIVED", { dept_id });
-    }
-
-    // Enterprise Audit: Record anonymous evaluation submission
-    await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${session_id} (${ratingsToInsert.length} ratings processed)`, 'SUCCESS');
-
+    // 4. INSTANT RESPONSE: Unblock the student's UI completely. 
+    // They are fully logged out and recorded as 'done'.
     res.json({ message: "Feedback submitted successfully" });
+
+    // 5. ASYNCHRONOUS HEAVY INGESTION QUEUE WORKER
+    setTimeout(async () => {
+      const trx = await db.transaction();
+      try {
+        if (ratingsToInsert.length > 0) await trx.batchInsert('global_student_feedback', ratingsToInsert, 100);
+        if (facultyRemarksToInsert.length > 0) await trx('global_faculty_remarks').insert(facultyRemarksToInsert);
+        if (sectionRemarksToInsert.length > 0) await trx('global_section_remarks').insert(sectionRemarksToInsert);
+
+        for (const score of scorecardUpdatesToInsert) {
+          await trx.raw(`
+            INSERT INTO global_faculty_scorecards (
+              dept_id, faculty_id, course_id, session_id, total_score_sum, ratings_count, genuine_count, excellent_count, good_count, average_count, poor_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+              total_score_sum = total_score_sum + VALUES(total_score_sum),
+              ratings_count = ratings_count + VALUES(ratings_count),
+              genuine_count = genuine_count + VALUES(genuine_count),
+              excellent_count = excellent_count + VALUES(excellent_count),
+              good_count = good_count + VALUES(good_count),
+              average_count = average_count + VALUES(average_count),
+              poor_count = poor_count + VALUES(poor_count)
+          `, [score.dept_id, score.faculty_id, score.course_id, score.session_id, score.sum, score.count, score.genuineCount, score.excellent, score.good, score.average, score.poor]);
+        }
+
+        if (department_remark && department_remark.trim() !== "") {
+          await trx('global_session_remarks').insert({
+            session_id, remark_text: department_remark.trim(), dept_id
+          });
+        }
+
+        await trx.commit();
+        
+        // Notify realtime dashboards
+        const io = req.app.get('io');
+        if (io) io.emit("NEW_FEEDBACK_RECEIVED", { dept_id });
+
+        await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${session_id} (${ratingsToInsert.length} ratings processed)`, 'SUCCESS');
+
+        // Phase 6: Vector Embeddings
+        const { generateEmbedding } = require('../utils/embedder');
+        for (const r of facultyRemarksToInsert) {
+          const vector = await generateEmbedding(r.remark_text);
+          if (vector) await db('global_faculty_remarks').where({ session_id: r.session_id, faculty_id: r.faculty_id, course_id: r.course_id, remark_text: r.remark_text }).update({ embedding: JSON.stringify(vector) });
+        }
+        for (const r of sectionRemarksToInsert) {
+          const vector = await generateEmbedding(r.remark_text);
+          if (vector) await db('global_section_remarks').where({ session_id: r.session_id, faculty_id: r.faculty_id, course_id: r.course_id, section_heading: r.section_heading, remark_text: r.remark_text }).update({ embedding: JSON.stringify(vector) });
+        }
+        if (department_remark && department_remark.trim() !== "") {
+          const vector = await generateEmbedding(department_remark);
+          if (vector) await db('global_session_remarks').where({ session_id, dept_id, remark_text: department_remark.trim() }).update({ embedding: JSON.stringify(vector) });
+        }
+
+      } catch (ingestErr) {
+        if (trx && !trx.isCompleted()) await trx.rollback();
+        console.error("Background Ingestion Error:", ingestErr);
+        // Fail-safe: Revert student status so they can try again
+        await db('global_students').where({ usn: student.usn, dept_id, session_id }).update({ session_id: null, feedback_given: 'pending' });
+        await db('global_used_tokens').where({ token: idempotency_key }).del().catch(()=>{});
+      }
+    }, 0);
+
   } catch (err) {
-    await trx.rollback();
-    console.error("Error submitting feedback:", err);
-    res.status(err.message === "Feedback already submitted" ? 403 : 500).json({ error: err.message || "Server error" });
+    console.error("Error staging feedback:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -380,10 +407,14 @@ const getSubjectsWithAvg = async (req, res) => {
   const dept_id = req.session.dept_id || req.query.dept_id;
 
   try {
-    const rows = await db('global_student_feedback')
-      .where({ faculty_id, dept_id, is_genuine: true })
+    let q = db('global_student_feedback')
+      .where({ faculty_id, is_genuine: true });
+    if (dept_id) {
+      q = q.andWhere({ dept_id });
+    }
+    const rows = await q
       .select('course_id')
-      .avg('rating as avg_rating')
+      .select(db.raw('ROUND(COALESCE(AVG(rating), 0), 2) as avg_rating'))
       .groupBy('course_id');
     res.json(rows);
   } catch (err) {
@@ -395,15 +426,43 @@ const getQuestionsAvg = async (req, res) => {
   const { faculty_id, course_id } = req.params;
   const dept_id = req.session.dept_id || req.query.dept_id;
   try {
-    const rows = await db('global_student_feedback as f')
-      .join('global_feedback_questions as q', 'f.question_id', 'q.question_id')
-      .where({ 'f.faculty_id': faculty_id, 'f.course_id': course_id, 'f.dept_id': dept_id, 'f.is_genuine': true })
-      .select('f.question_id', 'q.question_text', 'q.question_heading')
-      .avg('f.rating as avg_rating')
+    let q = db('global_student_feedback as f')
+      .join('global_feedback_questions as q', function() {
+        this.on('f.question_id', '=', 'q.question_id').andOn('f.dept_id', '=', 'q.dept_id');
+      })
+      .where({ 'f.faculty_id': faculty_id, 'f.course_id': course_id, 'f.is_genuine': true });
+
+    if (dept_id) {
+      q = q.andWhere({ 'f.dept_id': dept_id });
+    }
+
+    const rows = await q
+      .select('f.question_id', 'q.question_text', 'q.question_heading', db.raw('ROUND(COALESCE(AVG(f.rating), 0), 2) as avg_rating'))
       .groupBy('f.question_id', 'q.question_text', 'q.question_heading')
       .orderBy('f.question_id');
     res.json(rows);
   } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const getFeedbackTiming = async (req, res) => {
+  const { session_id } = req.params;
+  try {
+    const session = await db('global_sessions').where({ session_id }).first();
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+    const dept = await db('department').where({ dept_id: session.dept_id }).first();
+    const min_time_sec = dept?.feedback_min_time_sec != null ? Number(dept.feedback_min_time_sec) : 300;
+    res.json({
+      session_id,
+      dept_id: session.dept_id,
+      min_time_sec,
+      is_timer_enabled: min_time_sec > 0
+    });
+  } catch (err) {
+    console.error("Error fetching feedback timing:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -419,5 +478,6 @@ module.exports = {
   updateQuestion,
   deleteQuestion,
   getSubjectsWithAvg,
-  getQuestionsAvg
+  getQuestionsAvg,
+  getFeedbackTiming
 };

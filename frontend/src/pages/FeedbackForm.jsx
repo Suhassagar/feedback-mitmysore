@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import PageTransition from "../components/PageTransition";
 import { jumbleQuestionsForStudent } from "../utils/shuffleUtils";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 const QUICK_FEEDBACK_OPTIONS = [
   "Teaching pace too fast",
@@ -40,12 +41,27 @@ export default function FeedbackForm() {
   const [departmentRemark, setDepartmentRemark] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(null);
   
-  // Timer state (5 minutes = 300 seconds)
-  const MIN_TIME_SEC = 5 * 60;
-  const [timeLeft, setTimeLeft] = useState(MIN_TIME_SEC);
+  // Dynamic timer state (configured by department, default 300)
+  const [minTimeSec, setMinTimeSec] = useState(() => {
+    const cached = sessionStorage.getItem('feedback_min_time_sec');
+    return cached !== null ? parseInt(cached, 10) : 300;
+  });
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const cached = sessionStorage.getItem('feedback_min_time_sec');
+    const target = cached !== null ? parseInt(cached, 10) : 300;
+    if (target === 0) return 0;
+    const startTime = sessionStorage.getItem('feedback_start_time_local');
+    if (startTime) {
+      const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
+      return Math.max(0, target - elapsed);
+    }
+    return target;
+  });
   
   // Wizard step (0 to facultyList.length)
   const [currentStep, setCurrentStep] = useState(0);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!session_id) {
@@ -58,6 +74,25 @@ export default function FeedbackForm() {
       try {
         const tokenRes = await apiClient.get('/feedback/token', { withCredentials: true });
         setIdempotencyKey(tokenRes.data.token);
+
+        // Fetch dynamic submission timer configured by department
+        try {
+          const timingRes = await apiClient.get(`/feedback/timing/${session_id}`);
+          if (timingRes.data && typeof timingRes.data.min_time_sec === 'number') {
+            const configuredSec = timingRes.data.min_time_sec;
+            sessionStorage.setItem('feedback_min_time_sec', configuredSec);
+            setMinTimeSec(configuredSec);
+            if (configuredSec === 0) {
+              setTimeLeft(0);
+            } else {
+              const startT = sessionStorage.getItem('feedback_start_time_local') || Date.now();
+              const elapsed = Math.floor((Date.now() - parseInt(startT, 10)) / 1000);
+              setTimeLeft(Math.max(0, configuredSec - elapsed));
+            }
+          }
+        } catch {
+          // Graceful fallback to default
+        }
 
         const facRes = await apiClient.get(`/student/subjects/${session_id}`);
         setFacultyList(facRes.data);
@@ -91,14 +126,21 @@ export default function FeedbackForm() {
     }
     
     const timerInterval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - parseInt(startTime)) / 1000);
-      const remaining = Math.max(0, MIN_TIME_SEC - elapsed);
+      const cachedMin = sessionStorage.getItem('feedback_min_time_sec');
+      const activeMin = cachedMin !== null ? parseInt(cachedMin, 10) : minTimeSec;
+      if (activeMin === 0) {
+        setTimeLeft(0);
+        clearInterval(timerInterval);
+        return;
+      }
+      const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
+      const remaining = Math.max(0, activeMin - elapsed);
       setTimeLeft(remaining);
       if (remaining === 0) clearInterval(timerInterval);
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [session_id, navigate]);
+  }, [session_id, navigate, minTimeSec]);
 
   const handleRatingChange = (facultyIndex, questionId, rating) => {
     setFeedbackData((prev) => ({
@@ -180,9 +222,12 @@ export default function FeedbackForm() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSubmit = async () => {
-    if (!window.confirm("Submit your feedback? Responses cannot be edited after submission.")) return;
+  const handleSubmit = () => {
+    setShowSubmitModal(true);
+  };
 
+  const executeSubmit = async () => {
+    setIsSubmitting(true);
     try {
       const feedbackPayload = facultyList.map((faculty, fIndex) => ({
         faculty_id: faculty.faculty_id,
@@ -214,11 +259,14 @@ export default function FeedbackForm() {
       }
 
       toast.success("Feedback submitted successfully.");
+      setShowSubmitModal(false);
       navigate("/");
 
     } catch (err) {
       console.error(err.response?.data);
       toast.error(err.response?.data?.error || "Submission failed. Please check network connection.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1203,6 +1251,19 @@ export default function FeedbackForm() {
             )}
           </nav>
         </main>
+
+        {/* CONFIRMATION MODAL FOR FEEDBACK SUBMISSION */}
+        <ConfirmModal
+          isOpen={showSubmitModal}
+          onClose={() => setShowSubmitModal(false)}
+          onConfirm={executeSubmit}
+          title="Submit Course Evaluation"
+          message="Are you sure you want to finalize and submit your feedback responses?"
+          subtext="Once submitted, your confidential evaluation is encrypted and cannot be modified or re-taken."
+          confirmText="Confirm & Submit"
+          isDestructive={false}
+          isLoading={isSubmitting}
+        />
       </div>
     </PageTransition>
   );

@@ -6,6 +6,8 @@ import { Plus, Activity, Trash2, Mail } from "lucide-react";
 import PageTransition from "../components/PageTransition";
 import { useSessions } from "../hooks/useSessions";
 import useCopilotStore from "../store/useCopilotStore";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function ManageSessions() {
   const { dept_id } = useParams();
@@ -17,6 +19,9 @@ export default function ManageSessions() {
   const [sessionId, setSessionId] = useState("");
   const [sem, setSem] = useState("");
   const [section, setSection] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+  const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [trackSessionId, setTrackSessionId] = useState(null);
   const [trackData, setTrackData] = useState([]);
   const [notifying, setNotifying] = useState(null);
@@ -39,10 +44,26 @@ export default function ManageSessions() {
   const generateSessionId = () => {
     const id = "S" + Math.random().toString(36).substring(2, 8).toUpperCase();
     setSessionId(id);
+    setFormErrors(prev => ({ ...prev, sessionId: "" }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!sessionId.trim()) errors.sessionId = "Session ID is required";
+    if (!sem) {
+      errors.sem = "Semester is required";
+    } else if (parseInt(sem, 10) < 1 || parseInt(sem, 10) > 8) {
+      errors.sem = "Sem must be 1-8";
+    }
+    if (!section.trim()) errors.section = "Section is required";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const createSession = async () => {
-    if (!sessionId.trim() || !sem || !section.trim()) return toast.error("All fields required");
+    if (!validateForm()) {
+      return toast.error("Please fill in all required fields highlighted in red");
+    }
     try {
       await apiClient.post("/create-session", { 
         session_id: sessionId.trim(), 
@@ -50,21 +71,28 @@ export default function ManageSessions() {
         sem: parseInt(sem, 10), 
         section: section.trim().toUpperCase() 
       }, { withCredentials: true });
-      toast.success("Session Created");
+      toast.success("Session Created Successfully");
       setSessionId(""); setSem(""); setSection("");
+      setFormErrors({});
       loadSessions();
     } catch (err) { 
       toast.error(err.response?.data?.error || "Error creating session"); 
     }
   };
 
-  const deleteSession = async (session_id) => {
-    if (!window.confirm("Delete this session?")) return;
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
     try {
-      await apiClient.delete(`/delete-session/${session_id}`, { withCredentials: true });
-      toast.success("Session deleted");
+      setIsDeleting(true);
+      await apiClient.delete(`/delete-session/${sessionToDelete}`, { withCredentials: true });
+      toast.success("Session deleted successfully");
+      setSessionToDelete(null);
       loadSessions();
-    } catch (err) { toast.error("Error deleting session"); }
+    } catch (err) { 
+      toast.error("Error deleting session"); 
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleTrackSession = async (session_id) => {
@@ -222,20 +250,78 @@ export default function ManageSessions() {
             <div className="session-field-id flex-col gap-sm">
               <label className="field-label" style={{ fontSize: "13px" }}>Session ID</label>
               <div style={{ display: "flex", gap: "8px" }}>
-                <input type="text" className="form-input" style={{ padding: "10px", flex: 1 }} placeholder="e.g. S4X92" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ 
+                    padding: "10px", 
+                    flex: 1,
+                    borderColor: formErrors.sessionId ? "#EF4444" : undefined,
+                    boxShadow: formErrors.sessionId ? "0 0 0 1px #EF4444" : undefined
+                  }} 
+                  placeholder="e.g. S4X92" 
+                  value={sessionId} 
+                  onChange={(e) => {
+                    setSessionId(e.target.value);
+                    if (formErrors.sessionId) setFormErrors(prev => ({ ...prev, sessionId: "" }));
+                  }} 
+                />
                 <button className="btn session-gen-btn" onClick={generateSessionId}>Gen</button>
               </div>
+              {formErrors.sessionId && (
+                <span style={{ fontSize: "11.5px", color: "#DC2626", fontWeight: "600" }}>
+                  {formErrors.sessionId}
+                </span>
+              )}
             </div>
 
             {/* Sem & Sec Grouped */}
             <div className="session-field-semsec">
               <div className="flex-col gap-sm">
                 <label className="field-label" style={{ fontSize: "13px" }}>Semester</label>
-                <input type="number" className="form-input" style={{ padding: "10px" }} placeholder="1-8" value={sem} onChange={(e) => setSem(e.target.value)} />
+                <input 
+                  type="number" 
+                  className="form-input" 
+                  style={{ 
+                    padding: "10px",
+                    borderColor: formErrors.sem ? "#EF4444" : undefined,
+                    boxShadow: formErrors.sem ? "0 0 0 1px #EF4444" : undefined
+                  }} 
+                  placeholder="1-8" 
+                  value={sem} 
+                  onChange={(e) => {
+                    setSem(e.target.value);
+                    if (formErrors.sem) setFormErrors(prev => ({ ...prev, sem: "" }));
+                  }} 
+                />
+                {formErrors.sem && (
+                  <span style={{ fontSize: "11.5px", color: "#DC2626", fontWeight: "600" }}>
+                    {formErrors.sem}
+                  </span>
+                )}
               </div>
               <div className="flex-col gap-sm">
                 <label className="field-label" style={{ fontSize: "13px" }}>Section</label>
-                <input type="text" className="form-input" style={{ padding: "10px" }} placeholder="A/B/C" value={section} onChange={(e) => setSection(e.target.value.toUpperCase())} />
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ 
+                    padding: "10px",
+                    borderColor: formErrors.section ? "#EF4444" : undefined,
+                    boxShadow: formErrors.section ? "0 0 0 1px #EF4444" : undefined
+                  }} 
+                  placeholder="A/B/C" 
+                  value={section} 
+                  onChange={(e) => {
+                    setSection(e.target.value.toUpperCase());
+                    if (formErrors.section) setFormErrors(prev => ({ ...prev, section: "" }));
+                  }} 
+                />
+                {formErrors.section && (
+                  <span style={{ fontSize: "11.5px", color: "#DC2626", fontWeight: "600" }}>
+                    {formErrors.section}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -254,17 +340,19 @@ export default function ManageSessions() {
         
         {/* SESSIONS LIST */}
         {sessions.length === 0 ? (
-          <div className="card" style={{ padding: "36px 16px", textAlign: "center", color: "var(--text-secondary)" }}>
-            <Activity size={36} color="var(--text-secondary)" style={{ opacity: 0.5, marginBottom: "10px" }} />
-            <h4 style={{ margin: "0 0 4px 0", color: "var(--text-primary)", fontSize: "15px" }}>No Active Sessions</h4>
-            <p style={{ margin: 0, fontSize: "13px" }}>Create a new feedback session above to begin receiving student responses.</p>
-          </div>
+          <EmptyState 
+            icon={Activity}
+            title="No Active Sessions Found"
+            description="Create a new feedback session above to begin receiving and tracking student feedback."
+            actionLabel="Generate Session ID"
+            onAction={generateSessionId}
+          />
         ) : (
           <>
             {/* 1. DESKTOP TABLE VIEW (Visible on >= 769px) */}
             <div className="session-desktop-view">
               <div className="card" style={{ padding: "0", overflow: "hidden" }}>
-                <div style={{ overflowX: "auto" }}>
+                <div className="table-responsive-wrapper">
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
                     <thead style={{ borderBottom: "2px solid var(--border-color)", backgroundColor: "var(--bg-light)" }}>
                       <tr>
@@ -296,7 +384,7 @@ export default function ManageSessions() {
                               <button className="btn btn-track hoverable" style={{ height: "36px", padding: "0 16px", fontSize: "13px", borderRadius: "8px" }} onClick={() => handleTrackSession(s.session_id)}>
                                 <Activity size={14} /> Track
                               </button>
-                              <button className="btn btn-delete hoverable" style={{ height: "36px", padding: "0 16px", fontSize: "13px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => deleteSession(s.session_id)}>
+                              <button className="btn btn-delete hoverable" style={{ height: "36px", padding: "0 16px", fontSize: "13px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => setSessionToDelete(s.session_id)} aria-label="Delete Session">
                                 <Trash2 size={14} /> Delete
                               </button>
                             </div>
@@ -395,7 +483,8 @@ export default function ManageSessions() {
                         gap: "4px",
                         fontWeight: "600"
                       }} 
-                      onClick={() => deleteSession(s.session_id)}
+                      onClick={() => setSessionToDelete(s.session_id)}
+                      aria-label="Delete Session"
                     >
                       <Trash2 size={13} /> Delete
                     </button>
@@ -466,6 +555,19 @@ export default function ManageSessions() {
             </div>
           </div>
         )}
+
+        {/* CONFIRMATION MODAL FOR DESTRUCTIVE SESSION DELETION (UIUX-008) */}
+        <ConfirmModal
+          isOpen={!!sessionToDelete}
+          onClose={() => setSessionToDelete(null)}
+          onConfirm={confirmDeleteSession}
+          title="Delete Feedback Session"
+          message={`Are you sure you want to permanently delete session "${sessionToDelete}"?`}
+          subtext="This action cannot be undone. All active responses and telemetry linked to this session will be permanently erased."
+          confirmText="Yes, Delete Session"
+          isDestructive={true}
+          isLoading={isDeleting}
+        />
 
       </div>
     </PageTransition>

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import apiClient from "../services/apiClient";
-import { Plus, Edit, Trash2, FileText, CheckCircle2, Upload, Download, Folder } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, CheckCircle2, Upload, Download, Folder, Clock } from "lucide-react";
 import { toast } from "react-hot-toast";
 import PageTransition from "../components/PageTransition";
 import BulkUploadModal from "../components/BulkUploadModal";
+import FeedbackTimingModal from "../components/FeedbackTimingModal";
+import ConfirmModal from "../components/ui/ConfirmModal";
 
 export default function ManageQuestions() {
   const { dept_id } = useParams();
@@ -17,6 +19,10 @@ export default function ManageQuestions() {
   const [showAddHeadingModal, setShowAddHeadingModal] = useState(false);
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showTimingModal, setShowTimingModal] = useState(false);
+  const [timingSeconds, setTimingSeconds] = useState(300);
+  const [questionToDelete, setQuestionToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Form state
   const [questionText, setQuestionText] = useState("");
@@ -28,7 +34,19 @@ export default function ManageQuestions() {
 
   useEffect(() => {
     fetchQuestions();
+    fetchTiming();
   }, [dept_id]);
+
+  const fetchTiming = async () => {
+    try {
+      const res = await apiClient.get(`/department/timing/${dept_id}`, { withCredentials: true });
+      if (res.data && typeof res.data.min_time_sec === 'number') {
+        setTimingSeconds(res.data.min_time_sec);
+      }
+    } catch {
+      // Fallback silently to 300 default
+    }
+  };
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -113,14 +131,22 @@ export default function ManageQuestions() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this question? Associated feedback may be lost.")) return;
+  const handleDelete = (question) => {
+    setQuestionToDelete(question);
+  };
+
+  const confirmDeleteQuestion = async () => {
+    if (!questionToDelete) return;
+    setIsDeleting(true);
     try {
-      await apiClient.delete(`/department/questions/${id}`, { withCredentials: true });
+      await apiClient.delete(`/department/questions/${questionToDelete.question_id}`, { withCredentials: true });
       toast.success("Question deleted");
+      setQuestionToDelete(null);
       fetchQuestions();
     } catch (err) {
       toast.error("Error deleting question");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -175,6 +201,48 @@ export default function ManageQuestions() {
           </div>
           
           <div className="questions-header-actions" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+            <button 
+              className="btn hoverable" 
+              style={{ 
+                padding: "10px 18px", 
+                height: "42px", 
+                border: "1px solid #CBD5E1", 
+                background: "#F8FAFC", 
+                color: "#0F172A", 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "8px",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "13.5px",
+                transition: "all 0.15s ease",
+                cursor: "pointer"
+              }} 
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#F1F5F9";
+                e.currentTarget.style.borderColor = "#94A3B8";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#F8FAFC";
+                e.currentTarget.style.borderColor = "#CBD5E1";
+              }}
+              onClick={() => setShowTimingModal(true)}
+              title="Configure student submission dwell timer"
+            >
+              <Clock size={16} color="#475569" />
+              <span>Submission Timer:</span>
+              <span style={{
+                background: "#EEF2F6",
+                color: "#1E293B",
+                padding: "2px 8px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: "700",
+                border: "1px solid #E2E8F0"
+              }}>
+                {timingSeconds === 0 ? "Instant" : `${Math.floor(timingSeconds / 60)}m${timingSeconds % 60 ? ` ${timingSeconds % 60}s` : ""}`}
+              </span>
+            </button>
             <button className="btn hoverable" style={{ padding: "10px 20px", height: "42px", border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }} onClick={() => setShowBulkModal(true)}>
               <Upload size={16} /> Bulk Import
             </button>
@@ -258,7 +326,7 @@ export default function ManageQuestions() {
                             <button 
                               className="btn hoverable" 
                               style={{ padding: "6px", background: "rgba(239, 68, 68, 0.1)", color: "#EF4444", border: "none", borderRadius: "6px" }}
-                              onClick={() => handleDelete(q.question_id)}
+                              onClick={() => handleDelete(q)}
                               title="Delete Question"
                             >
                               <Trash2 size={14} />
@@ -381,6 +449,28 @@ export default function ManageQuestions() {
           }} 
         />
       )}
+
+      {/* TIMING CONFIGURATION MODAL */}
+      <FeedbackTimingModal
+        isOpen={showTimingModal}
+        onClose={() => setShowTimingModal(false)}
+        dept_id={dept_id}
+        currentSeconds={timingSeconds}
+        onSaveSuccess={(newSecs) => setTimingSeconds(newSecs)}
+      />
+
+      {/* CONFIRMATION MODAL FOR QUESTION DELETION */}
+      <ConfirmModal
+        isOpen={!!questionToDelete}
+        onClose={() => setQuestionToDelete(null)}
+        onConfirm={confirmDeleteQuestion}
+        title="Delete Question"
+        message="Are you sure you want to delete this question?"
+        subtext={questionToDelete ? `"${questionToDelete.question_text}" — Any associated historical feedback for this question will be impacted.` : ""}
+        confirmText="Yes, Delete"
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
     </PageTransition>
   );
 }

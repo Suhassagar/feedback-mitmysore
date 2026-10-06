@@ -45,9 +45,13 @@ function decrypt(text) {
   }
 }
 
+const path = require("path");
+
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (needed for secure cookies behind a load balancer/reverse proxy)
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -81,6 +85,7 @@ app.use(
 
 // --- JSON parsing ---
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // --- Health / Ping Keep-Alive Endpoints ---
 // Fast endpoints for Render keep-alive and external monitors (e.g. cron-job.org / UptimeRobot)

@@ -4,9 +4,8 @@ const getDepartmentAnalytics = async (req, res) => {
   const { dept_id } = req.params;
   try {
     const avgResult = await db('global_student_feedback')
-      .join('global_sessions', 'global_student_feedback.session_id', 'global_sessions.session_id')
-      .where('global_student_feedback.dept_id', dept_id)
-      .andWhere('global_student_feedback.is_genuine', true)
+      .where('dept_id', dept_id)
+      .andWhere('is_genuine', true)
       .avg('rating as avg_rating')
       .first();
 
@@ -21,7 +20,9 @@ const getDepartmentAnalytics = async (req, res) => {
       .first();
 
     const trendRows = await db('global_student_feedback as sf')
-      .join('global_sessions as s', 'sf.session_id', 's.session_id')
+      .join('global_sessions as s', function() {
+        this.on('sf.session_id', '=', 's.session_id').andOn('sf.dept_id', '=', 's.dept_id');
+      })
       .where('sf.dept_id', dept_id)
       .andWhere('sf.is_genuine', true)
       .andWhere('sf.created_at', '>=', db.raw('DATE_SUB(CURDATE(), INTERVAL 6 DAY)'))
@@ -33,7 +34,7 @@ const getDepartmentAnalytics = async (req, res) => {
       .orderByRaw('DATE(sf.created_at) ASC');
 
     res.json({
-      avgRating: avgResult.avg_rating ? parseFloat(avgResult.avg_rating).toFixed(1) : "0.0",
+      avgRating: avgResult.avg_rating ? parseFloat(avgResult.avg_rating).toFixed(2) : "0.00",
       totalSubmitted: completedResult.completed_feedbacks || 0,
       totalStudents: totalResult.total_students || 0,
       trendData: trendRows
@@ -67,55 +68,83 @@ const getFacultyAnalytics = async (req, res) => {
       .first();
 
     // 1. Overall Stats
-    const stats = await db('global_student_feedback as sf')
-      .leftJoin('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
-      .andWhere(filterClause)
+    let statsQuery = db('global_faculty_scorecards as sc')
+      .leftJoin('global_sessions as s', function() {
+        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+      })
+      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
       .select(
-        db.raw('AVG(sf.rating) as avg_rating'),
-        db.raw('COUNT(sf.rating) as total_feedback')
-      )
-      .first();
+        db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.genuine_count), 0), 0), 2) as avg_rating'),
+        db.raw('SUM(sc.ratings_count) as total_feedback')
+      );
+      
+    if (course_id && sem && section) {
+      statsQuery = statsQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
+    }
+    const stats = await statsQuery.first();
 
     // 2. Rating Distribution
-    const distribution = await db('global_student_feedback as sf')
-      .leftJoin('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
-      .andWhere(filterClause)
+    let distQuery = db('global_faculty_scorecards as sc')
+      .leftJoin('global_sessions as s', function() {
+        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+      })
+      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
       .select(
-        db.raw('SUM(CASE WHEN sf.rating >= 4.5 THEN 1 ELSE 0 END) as excellent'),
-        db.raw('SUM(CASE WHEN sf.rating >= 3.5 AND sf.rating < 4.5 THEN 1 ELSE 0 END) as good'),
-        db.raw('SUM(CASE WHEN sf.rating >= 2.5 AND sf.rating < 3.5 THEN 1 ELSE 0 END) as average'),
-        db.raw('SUM(CASE WHEN sf.rating < 2.5 THEN 1 ELSE 0 END) as poor')
-      )
-      .first();
+        db.raw('SUM(sc.excellent_count) as excellent'),
+        db.raw('SUM(sc.good_count) as good'),
+        db.raw('SUM(sc.average_count) as average'),
+        db.raw('SUM(sc.poor_count) as poor')
+      );
+      
+    if (course_id && sem && section) {
+      distQuery = distQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
+    }
+    const distribution = await distQuery.first();
 
     // 3. Trend Data
-    const trendData = await db('global_student_feedback as sf')
-      .join('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
-      .andWhere(filterClause)
-      .select('s.sem', db.raw('AVG(sf.rating) as avg_rating'))
+    let trendQuery = db('global_faculty_scorecards as sc')
+      .join('global_sessions as s', function() {
+        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+      })
+      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
+      .select('s.sem', db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.genuine_count), 0), 0), 2) as avg_rating'))
       .groupBy('s.sem')
       .orderBy('s.sem', 'asc');
+      
+    if (course_id && sem && section) {
+      trendQuery = trendQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
+    }
+    const trendData = await trendQuery;
 
-    // 4. Question-level breakdown
+    // 4. Question-level breakdown (Composite key join on question_id + dept_id)
     const radarData = await db('global_student_feedback as sf')
-      .join('global_feedback_questions as q', 'sf.question_id', 'q.question_id')
-      .leftJoin('global_sessions as s', 'sf.session_id', 's.session_id')
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
-      .andWhere(filterClause)
-      .select('q.question_text as question', db.raw('AVG(sf.rating) as avg_rating'))
-      .groupBy('sf.question_id', 'q.question_text');
-
-    // 5. Subject-level breakdown
-    const subjectData = await db('global_student_feedback as sf')
-      .join('global_course as c', function() {
-        this.on('sf.course_id', '=', 'c.course_code').andOn('sf.dept_id', '=', 'c.dept_id');
+      .join('global_feedback_questions as q', function() {
+        this.on('sf.question_id', '=', 'q.question_id').andOn('sf.dept_id', '=', 'q.dept_id');
+      })
+      .leftJoin('global_sessions as s', function() {
+        this.on('sf.session_id', '=', 's.session_id').andOn('sf.dept_id', '=', 's.dept_id');
       })
       .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
-      .select('c.course_name', 'c.course_code', db.raw('AVG(sf.rating) as avg_rating'))
-      .groupBy('sf.course_id', 'c.course_name', 'c.course_code');
+      .andWhere(filterClause)
+      .select('q.question_text as question', db.raw('ROUND(COALESCE(AVG(sf.rating), 0), 2) as avg_rating'))
+      .groupBy('sf.question_id', 'q.question_text');
+
+    // 5. Subject-level breakdown (Includes section filterClause)
+    let subjectQuery = db('global_faculty_scorecards as sc')
+      .join('global_course as c', function() {
+        this.on('sc.course_id', '=', 'c.course_code').andOn('sc.dept_id', '=', 'c.dept_id');
+      })
+      .leftJoin('global_sessions as s', function() {
+        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+      })
+      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
+      .select('c.course_name', 'c.course_code', db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.genuine_count), 0), 0), 2) as avg_rating'))
+      .groupBy('sc.course_id', 'c.course_name', 'c.course_code');
+      
+    if (course_id && sem && section) {
+      subjectQuery = subjectQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
+    }
+    const subjectData = await subjectQuery;
 
     // 6. Assigned Subjects & Student Participation
     const assignedSubjects = await db('global_assign as a')
@@ -183,7 +212,7 @@ const getTopFaculties = async (req, res) => {
       .select(
         'f.faculty_id', 'f.name', 'f.email', 'f.dept_id as dept_name',
         'c.course_name', 'c.course_code', 's.sem', 's.section',
-        db.raw('AVG(fr.rating) AS avg_rating')
+        db.raw('ROUND(COALESCE(AVG(fr.rating), 0), 2) AS avg_rating')
       )
       .groupBy('f.faculty_id', 'f.name', 'f.email', 'f.dept_id', 'c.course_name', 'c.course_code', 's.sem', 's.section')
       .orderBy('avg_rating', 'desc');

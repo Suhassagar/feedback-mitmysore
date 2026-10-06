@@ -3,9 +3,10 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../services/apiClient";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, PieChart, Pie, Cell } from "recharts";
-import { Star, BookOpen, Calendar, CheckCircle, TrendingUp, Download, Bell, Inbox, ChevronRight } from "lucide-react";
+import { Star, BookOpen, Calendar, CheckCircle, TrendingUp, Download, Bell, Inbox, ChevronRight, BarChart3 } from "lucide-react";
 import * as XLSX from "xlsx";
 import StudentRosterModal from "../features/faculty/components/StudentRosterModal";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function FacultyDashboard() {
   const { user } = useAuth();
@@ -96,11 +97,59 @@ export default function FacultyDashboard() {
   };
 
   if (loading) {
-    return <div style={{ padding: '40px' }}><h2>Loading Dashboard...</h2></div>;
+    return (
+      <div className="theme-faculty fade-in" style={{ padding: 'clamp(16px, 4vw, 40px)', maxWidth: '1400px', margin: '0 auto' }}>
+        {/* Skeleton Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div className="skeleton" style={{ height: '32px', width: '280px', borderRadius: '8px', marginBottom: '8px' }} />
+            <div className="skeleton" style={{ height: '16px', width: '180px', borderRadius: '6px' }} />
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="skeleton" style={{ height: '42px', width: '160px', borderRadius: '12px' }} />
+            <div className="skeleton" style={{ height: '42px', width: '140px', borderRadius: '12px' }} />
+          </div>
+        </div>
+
+        {/* Skeleton KPI Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className="skeleton" style={{ height: '14px', width: '100px', borderRadius: '4px' }} />
+                <div className="skeleton" style={{ height: '36px', width: '36px', borderRadius: '10px' }} />
+              </div>
+              <div className="skeleton" style={{ height: '32px', width: '80px', borderRadius: '6px' }} />
+              <div className="skeleton" style={{ height: '12px', width: '140px', borderRadius: '4px' }} />
+            </div>
+          ))}
+        </div>
+
+        {/* Skeleton Charts Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div className="card" style={{ padding: '28px', height: '340px' }}>
+            <div className="skeleton" style={{ height: '20px', width: '160px', borderRadius: '6px', marginBottom: '20px' }} />
+            <div className="skeleton" style={{ height: '240px', width: '100%', borderRadius: '12px' }} />
+          </div>
+          <div className="card" style={{ padding: '28px', height: '340px' }}>
+            <div className="skeleton" style={{ height: '20px', width: '160px', borderRadius: '6px', marginBottom: '20px' }} />
+            <div className="skeleton" style={{ height: '240px', width: '100%', borderRadius: '12px' }} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!analytics) {
-    return <div style={{ padding: '40px' }}><h2>No Data Found</h2></div>;
+    return (
+      <div className="theme-faculty" style={{ padding: '40px', maxWidth: '700px', margin: '60px auto' }}>
+        <EmptyState 
+          icon={BarChart3}
+          title="No Analytics Available"
+          description="We couldn't find feedback analytics for your account. If you've recently joined, feedback metrics will appear here once evaluation sessions are active."
+        />
+      </div>
+    );
   }
 
   // --- DATA PREPARATION ---

@@ -21,6 +21,7 @@ import {
   Filter
 } from "lucide-react";
 import PageTransition from "../components/PageTransition";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function AuditLogs() {
   const { dept_id } = useParams();
@@ -201,8 +202,16 @@ export default function AuditLogs() {
         {/* Audit Log Stream */}
         <div className="dash-card flex-col" style={{ gap: "0", padding: "0" }}>
           {loading ? (
-            <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)" }}>
-              Loading security logs...
+            <div style={{ display: "flex", flexDirection: "column", padding: "16px 20px", gap: "16px" }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                  <div className="skeleton" style={{ width: "38px", height: "38px", borderRadius: "50%", flexShrink: 0 }} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                    <div className="skeleton" style={{ width: "40%", height: "16px" }} />
+                    <div className="skeleton" style={{ width: "20%", height: "12px" }} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : error ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#EF4444" }}>
@@ -210,15 +219,15 @@ export default function AuditLogs() {
               <p>{error}</p>
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div style={{ padding: "48px 20px", textAlign: "center", color: "var(--text-secondary)" }}>
-              <Shield size={44} color="var(--border-color)" style={{ marginBottom: "12px" }} />
-              <p style={{ margin: "0 0 6px 0", fontWeight: "600" }}>No audit log entries found</p>
-              <p style={{ margin: 0, fontSize: "13px" }}>
-                {searchTerm || selectedAction !== "ALL" 
-                  ? "Try clearing filters or search terms." 
-                  : "Activity events will appear here as administrative actions occur."}
-              </p>
-            </div>
+            <EmptyState
+              icon={Shield}
+              title="No audit log entries found"
+              description={searchTerm || selectedAction !== "ALL" 
+                ? "No log events match your current filter criteria. Try clearing search or changing the filter." 
+                : "Activity events will automatically appear here as administrative actions occur."}
+              actionText={searchTerm || selectedAction !== "ALL" ? "Reset Filters" : undefined}
+              onAction={searchTerm || selectedAction !== "ALL" ? () => { setSearchTerm(""); setSelectedAction("ALL"); } : undefined}
+            />
           ) : (
             <div style={{ display: "flex", flexDirection: "column" }}>
               {filteredLogs.map((log, index) => {

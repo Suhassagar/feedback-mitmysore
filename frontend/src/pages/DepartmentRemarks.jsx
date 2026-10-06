@@ -6,6 +6,7 @@ import { MessageSquare, Sparkles, Filter, Clock } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import PageTransition from "../components/PageTransition";
 import { useSessions } from "../hooks/useSessions";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function DepartmentRemarks() {
   const { dept_id } = useParams();
@@ -157,14 +158,14 @@ export default function DepartmentRemarks() {
 
           <div className="remarks-summary-body" style={{ padding: "40px 32px", background: "#fff" }}>
             {!aiSummary ? (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "#94A3B8", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
-                 <div style={{ background: "#F8FAFC", padding: "20px", borderRadius: "50%" }}>
-                   <Sparkles size={40} color="#CBD5E1" />
-                 </div>
-                 <p style={{ fontSize: "16px", fontWeight: "500" }}>
-                   {remarks.length === 0 ? "No remarks available to analyze for this scope." : "No AI Summary has been generated for this scope yet. Click the button above to synthesize the data!"}
-                 </p>
-              </div>
+              <EmptyState
+                icon={Sparkles}
+                title={remarks.length === 0 ? "No remarks to analyze" : "No AI Summary Generated"}
+                description={remarks.length === 0 ? "Anonymous student remarks must be submitted before Gemini Intelligence can synthesize themes." : "Click 'Generate AI Report' above to synthesize actionable themes and key takeaways from student remarks."}
+                actionText={remarks.length > 0 ? "Generate AI Report" : undefined}
+                onAction={remarks.length > 0 ? handleGenerateSummary : undefined}
+                compact
+              />
             ) : (
               <div className="markdown-body" style={{ color: "#334155", lineHeight: "1.8", fontSize: "15px" }}>
                 <ReactMarkdown
@@ -189,11 +190,18 @@ export default function DepartmentRemarks() {
           </h3>
           
           {loading ? (
-            <div style={{ padding: "40px", textAlign: "center", color: "var(--slate)" }}>Loading remarks...</div>
-          ) : remarks.length === 0 ? (
-            <div className="card" style={{ padding: "40px", textAlign: "center", color: "var(--slate)", borderStyle: "dashed" }}>
-              No remarks found for this scope.
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="skeleton" style={{ height: "140px", borderRadius: "16px" }} />
+              ))}
             </div>
+          ) : remarks.length === 0 ? (
+            <EmptyState
+              icon={MessageSquare}
+              title="No Remarks Found"
+              description="No student comments have been submitted for this session scope yet."
+              compact
+            />
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
               {sessionList.map(session => (
@@ -245,7 +253,12 @@ export default function DepartmentRemarks() {
             
             <div style={{ overflowY: "auto", flexGrow: 1, paddingRight: "8px", display: "flex", flexDirection: "column", gap: "16px", padding: "8px 0" }}>
               {modalSession.comments.length === 0 ? (
-                <p style={{ color: "var(--text-secondary)", textAlign: "center", padding: "40px 0" }}>No comments available.</p>
+                <EmptyState
+                  icon={MessageSquare}
+                  title="No Comments Available"
+                  description="No individual comments were provided for this session."
+                  compact
+                />
               ) : (
                 modalSession.comments.map((r, i) => (
                   <div key={r.remark_id} style={{ background: "#F8FAFC", padding: "20px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
