@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-mitmysore.vercel.app-2563eb?style=for-the-badge&logo=vercel&logoColor=white)](https://mitmysore.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-mitm-abhipraya.vercel.app-2563eb?style=for-the-badge&logo=vercel&logoColor=white)](https://mitm-abhipraya.vercel.app)
 [![React 19](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Database](https://img.shields.io/badge/Database-TiDB%20Cloud%20%2F%20MySQL-f97316?style=for-the-badge&logo=mysql&logoColor=white)](https://tidbcloud.com)
@@ -11,7 +11,7 @@
 
 **A secure, full-stack, enterprise-grade academic feedback and performance analytics ecosystem built for Maharaja Institute of Technology Mysore.**
 
-[Explore Live Web App](https://mitmysore.vercel.app) · [Report Bug](https://github.com/Suhassagar/feedback-mitmysore/issues) · [Request Feature](https://github.com/Suhassagar/feedback-mitmysore/issues)
+[Explore Live Web App](https://mitm-abhipraya.vercel.app) · [Report Bug](https://github.com/Suhassagar/feedback-mitmysore/issues) · [Request Feature](https://github.com/Suhassagar/feedback-mitmysore/issues)
 
 </div>
 
@@ -75,7 +75,7 @@ Built on a cloud-native, high-throughput architecture, the system incorporates:
 ```mermaid
 graph TD
     subgraph Client Layer
-        A[Students\nmitmysore.vercel.app]
+        A[Students\nmitm-abhipraya.vercel.app]
         B[Faculty Members]
         C[HOD / Department Heads]
         D[Super Administrators]
@@ -293,4 +293,4 @@ Distributed under the **MIT License**. See the [`LICENSE`](LICENSE) file for com
 **Suhas Sagar**  
 Maharaja Institute of Technology Mysore  
 - 🐙 GitHub: [@Suhassagar](https://github.com/Suhassagar)  
-- 🌐 Web: [mitmysore.vercel.app](https://mitmysore.vercel.app)
+- 🌐 Web: [mitm-abhipraya.vercel.app](https://mitm-abhipraya.vercel.app)

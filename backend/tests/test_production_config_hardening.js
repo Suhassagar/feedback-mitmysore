@@ -23,6 +23,7 @@ async function runTests() {
     
     const allowed = [
       ...(!isProduction ? ["http://localhost:5173", "http://127.0.0.1:5173"] : []),
+      "https://mitm-abhipraya.vercel.app",
       "https://mitmysore.vercel.app",
       frontendUrl,
       ...parsedAdditional
@@ -50,6 +51,7 @@ async function runTests() {
   assert.strictEqual(prodCheck('https://feedback-mitmysore-phishing.vercel.app'), false, 'Wildcard phishing Vercel subdomains must be blocked');
 
   // In production, canonical and explicit URLs must be ALLOWED
+  assert.strictEqual(prodCheck('https://mitm-abhipraya.vercel.app'), true, 'Primary rebranded domain must be allowed');
   assert.strictEqual(prodCheck('https://mitmysore.vercel.app'), true, 'Canonical institutional domain must be allowed');
   assert.strictEqual(prodCheck('https://custom-portal.mitmysore.in'), true, 'Configured FRONTEND_URL must be allowed');
   assert.strictEqual(prodCheck('https://preview.mitmysore.in'), true, 'Configured ADDITIONAL_ALLOWED_ORIGINS must be allowed');

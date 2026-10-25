@@ -69,7 +69,7 @@ const verifyEmailService = async () => {
 const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   const transporter = getTransporter();
   const cleanUser = String(process.env.EMAIL_USER || '').trim();
-  const loginUrl = process.env.FRONTEND_URL || 'https://mitmysore.vercel.app';
+  const loginUrl = process.env.FRONTEND_URL || 'https://mitm-abhipraya.vercel.app';
 
   // Sanitize all dynamic variables against HTML / markup injection
   const safeStudentName = escapeHtml(studentName || 'Student');
@@ -84,7 +84,7 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   const resolvedLogoPath = fs.existsSync(localBackendLogo) ? localBackendLogo : (fs.existsSync(frontendLogo) ? frontendLogo : (fs.existsSync(legacyFrontendLogo) ? legacyFrontendLogo : null));
 
   const attachments = [];
-  let logoImgSrc = 'https://mitmysore.vercel.app/logo.jpeg';
+  let logoImgSrc = 'https://mitm-abhipraya.vercel.app/logo.jpeg';
 
   if (resolvedLogoPath) {
     attachments.push({
