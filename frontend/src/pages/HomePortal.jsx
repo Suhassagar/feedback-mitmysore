@@ -75,7 +75,7 @@ export default function HomePortal() {
           <div className="home-logo-section">
             <img src="/logo.jpeg" alt="MIT Mysore Logo" className="home-logo" />
             <div className="home-logo-text">
-              <strong>Maharaja Institute of Technology<br />Mysore</strong>
+              <strong>Maharaja Institute of Technology. Mysore</strong>
               <span>Est. 2007</span>
             </div>
           </div>

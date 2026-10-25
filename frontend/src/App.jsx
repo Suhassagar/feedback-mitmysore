@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import PageTransition from "./components/PageTransition";
@@ -11,7 +11,6 @@ import FacultyLayout from "./components/FacultyLayout";
 import FacultyDashboard from "./pages/FacultyDashboard";
 import FacultySettings from "./pages/FacultySettings";
 import FacultyProfile from "./pages/FacultyProfile";
-import DepartmentPage from "./pages/DepartmentPage";
 import AddCoursePage from "./pages/AddCoursepage";
 import FeedbackForm from "./pages/FeedbackForm";
 
@@ -43,6 +42,11 @@ import AuditLogs from "./pages/AuditLogs";
 import DepartmentSettings from "./pages/DepartmentSettings";
 import NotFound from "./pages/NotFound";
 
+
+function DepartmentRedirect() {
+  const { dept_id } = useParams();
+  return <Navigate to={`/department-dashboard/${dept_id}`} replace />;
+}
 
 function App() {
   const navigate = useNavigate();
@@ -128,8 +132,8 @@ function App() {
           <Route path="/faculty-profile" element={<FacultyProfile />} />
         </Route>
 
-        {/* Guarded Student Evaluation & Legacy Department Routes */}
-        <Route path="/department/:dept_id" element={<ProtectedRoute allowedRoles={['admin', 'department']}><DepartmentPage /></ProtectedRoute>} />
+        {/* Legacy Department Route Redirect */}
+        <Route path="/department/:dept_id" element={<DepartmentRedirect />} />
         <Route path="/feedback" element={<ProtectedRoute allowedRoles={['student']}><FeedbackForm /></ProtectedRoute>} />
 
         {/* Global Catch-All 404 Route */}
