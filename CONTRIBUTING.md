@@ -13,7 +13,7 @@ Please ensure all communications and contributions remain respectful, collaborat
 
 The repository follows a clean branch workflow:
 - **`main`**: Development branch. All active development, features, and bugfixes are merged here first.
-- **`prod`**: Production branch. Code here is deployed directly to [mitmysore.vercel.app](https://mitmysore.vercel.app) and Render.
+- **`prod`**: Production branch. Code here is deployed directly to [mitm-abhipraya.vercel.app](https://mitm-abhipraya.vercel.app) and Render.
 - **`feature/<name>`** or **`fix/<issue>`**: Dedicated branches for major enhancements or bug fixes.
 
 ---

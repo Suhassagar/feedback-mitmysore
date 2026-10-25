@@ -51,6 +51,7 @@ const parseAdditionalOrigins = () => {
 const allowedOrigins = [
   // Only permit local development origins when NOT in production
   ...(!isProduction ? ["http://localhost:5173", "http://127.0.0.1:5173"] : []),
+  "https://mitm-abhipraya.vercel.app",
   "https://mitmysore.vercel.app",
   process.env.FRONTEND_URL,
   ...parseAdditionalOrigins()
