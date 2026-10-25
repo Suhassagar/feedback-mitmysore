@@ -76,8 +76,9 @@ app.use(
       }
       return callback(null, false);
     },
-    methods: ["POST", "GET", "PUT", "DELETE", "PATCH"],
+    methods: ["POST", "GET", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true, // allow cookies
+    optionsSuccessStatus: 200,
   })
 );
 
