@@ -31,7 +31,15 @@ export default function FacultyLogin() {
 
       if (res.data.success) {
         await checkSession();
-        navigate("/faculty-dashboard");
+        if (res.data.must_change_password) {
+          toast("Security Alert: Default password detected. Please change your password immediately.", { 
+            icon: '🔒', 
+            duration: 6000 
+          });
+          navigate("/faculty-settings");
+        } else {
+          navigate("/faculty-dashboard");
+        }
       } else {
         setError(res.data.message || "Invalid credentials");
       }
@@ -103,13 +111,6 @@ export default function FacultyLogin() {
                     )}
                   </button>
                 </div>
-              </div>
-
-              <div className="login-options">
-                <label>
-                  <input type="checkbox" /> Remember me
-                </label>
-                <a href="#">Forgot Password?</a>
               </div>
 
               {error && (

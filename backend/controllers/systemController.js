@@ -1,37 +1,8 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
 const bcrypt = require('bcrypt');
-const crypto = require("crypto");
-
-// --- Encryption Helpers for Notes ---
-const ENCRYPTION_KEY = crypto.scryptSync(process.env.SESSION_SECRET || 'fallback', 'salt', 32);
-const IV_LENGTH = 16;
-
-function encrypt(text) {
-  if (!text) return text;
-  let iv = crypto.randomBytes(IV_LENGTH);
-  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-  let encrypted = cipher.update(text);
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
-
-function decrypt(text) {
-  if (!text) return text;
-  let textParts = text.split(':');
-  if (textParts.length !== 2) return text;
-  try {
-    let iv = Buffer.from(textParts[0], 'hex');
-    let encryptedText = Buffer.from(textParts[1], 'hex');
-    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-  } catch (err) {
-    return "[Encrypted Message - Decryption Failed]";
-  }
-}
-
+const { encrypt, decrypt } = require('../utils/encryption');
+const { escapeSqlLike } = require('../utils/sanitizer');
 const { processAndUploadLogo } = require('../utils/imageProcessor');
 
 const getDepartments = async (req, res) => {
@@ -195,6 +166,7 @@ const getFacultyByDept = async (req, res) => {
         'f.position',
         'f.dob',
         'f.joining_date',
+        'f.profile_picture_url',
         db.raw('(SELECT COUNT(DISTINCT a.course_code) FROM global_assign a WHERE a.faculty_id = f.faculty_id AND a.dept_id = f.dept_id) as totalSubjects'),
         db.raw('(SELECT ROUND(COALESCE(AVG(sf.rating), 0), 2) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id AND sf.is_genuine = 1) as avg_rating'),
         db.raw('(SELECT COUNT(sf.rating) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id AND sf.is_genuine = 1) as total_feedback')
@@ -301,6 +273,13 @@ const bulkUploadStudents = async (req, res) => {
     return res.status(400).json({ error: "Invalid payload" });
   }
   const cleanDeptId = String(dept_id).trim().toUpperCase();
+  if (req.session?.role === 'department' && req.session.dept_id && req.session.dept_id.toUpperCase() !== cleanDeptId) {
+    return res.status(403).json({ error: "Unauthorized: Cannot bulk upload students for another department." });
+  }
+
+  if (students.length > 1000) {
+    return res.status(400).json({ error: "Batch size exceeds maximum limit of 1000 records per upload." });
+  }
   const trx = await db.transaction();
   try {
     let insertedCount = 0;
@@ -378,7 +357,7 @@ const globalSearch = async (req, res) => {
   const q = req.query.q || "";
   if (!q.trim()) return res.json({ faculty: [], students: [], sessions: [] });
   try {
-    const search = `%${q}%`;
+    const search = `%${escapeSqlLike(q)}%`;
     const faculty = await db('global_faculty').where({ dept_id })
       .andWhere(function() { this.where('name', 'like', search).orWhere('faculty_id', 'like', search); })
       .select('faculty_id as id', 'name', 'email as subtext').limit(5);

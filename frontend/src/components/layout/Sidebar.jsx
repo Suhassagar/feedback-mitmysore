@@ -3,7 +3,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useUIStore } from "../../store/useUIStore";
 import { 
   LayoutDashboard, Users, GraduationCap, 
-  BookOpen, FileText, BarChart3, Settings, LogOut, ChevronDown 
+  CalendarCheck, BookOpen, HelpCircle, FileText, 
+  BarChart3, Settings, LogOut, History 
 } from "lucide-react";
 
 export default function Sidebar({ dept_id }) {
@@ -21,11 +22,11 @@ export default function Sidebar({ dept_id }) {
     { name: "Overview", icon: <LayoutDashboard size={20} />, path: `/department-dashboard/${dept_id}` },
     { name: "Students", icon: <Users size={20} />, path: `/manage-students/${dept_id}` },
     { name: "Faculty", icon: <GraduationCap size={20} />, path: `/manage-faculty/${dept_id}` },
-    { name: "Sessions", icon: <BookOpen size={20} />, path: `/manage-sessions/${dept_id}` },
+    { name: "Sessions", icon: <CalendarCheck size={20} />, path: `/manage-sessions/${dept_id}` },
     { name: "Courses", icon: <BookOpen size={20} />, path: `/add-course/${dept_id}` },
-    { name: "Questions", icon: <FileText size={20} />, path: `/manage-questions/${dept_id}` },
+    { name: "Questions", icon: <HelpCircle size={20} />, path: `/manage-questions/${dept_id}` },
     { name: "Remarks", icon: <BarChart3 size={20} />, path: `/department-remarks/${dept_id}` },
-    { name: "Audit Logs", icon: <FileText size={20} />, path: `/audit-logs/${dept_id}` },
+    { name: "Audit Logs", icon: <History size={20} />, path: `/audit-logs/${dept_id}` },
     { name: "Settings", icon: <Settings size={20} />, path: `/department-settings/${dept_id}` },
   ];
 

@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
 const bcrypt = require('bcrypt');
+const { escapeSqlLike } = require('../utils/sanitizer');
 
 const getGlobalMetrics = async (req, res) => {
   try {
@@ -33,7 +34,10 @@ const getGlobalMetrics = async (req, res) => {
       totalFaculty,
       activeSessions,
       globalRating,
-      completionRate
+      completionRate,
+      completedStudents: completed,
+      pendingStudents: Math.max(0, total - completed),
+      totalAssigned: total
     });
   } catch (err) {
     console.error("Error fetching global metrics:", err);
@@ -47,6 +51,7 @@ const getGlobalFaculties = async (req, res) => {
       .join('department as d', 'f.dept_id', 'd.dept_id')
       .select(
         'f.faculty_id', 'f.name', 'f.email', 'f.position', 'f.dob', 'f.joining_date', 'f.dept_id', 'd.dept_name',
+        'f.profile_picture_url',
         db.raw(`(SELECT ROUND(COALESCE(AVG(rating), 0), 2) FROM global_student_feedback sf WHERE sf.faculty_id = f.faculty_id AND sf.dept_id = f.dept_id AND sf.is_genuine = 1) as avg_rating`)
       );
     res.json(rows);
@@ -70,8 +75,9 @@ const getGlobalStudents = async (req, res) => {
     if (dept_id) baseQuery = baseQuery.where('s.dept_id', dept_id);
     if (sem) baseQuery = baseQuery.where('s.sem', sem);
     if (search) {
+      const safeSearch = escapeSqlLike(search);
       baseQuery = baseQuery.where(function() {
-        this.where('s.usn', 'like', `%${search}%`).orWhere('s.name', 'like', `%${search}%`);
+        this.where('s.usn', 'like', `%${safeSearch}%`).orWhere('s.name', 'like', `%${safeSearch}%`);
       });
     }
 
@@ -111,9 +117,38 @@ const getGlobalSessions = async (req, res) => {
   try {
     const rows = await db('global_sessions as s')
       .join('department as d', 's.dept_id', 'd.dept_id')
-      .select('s.session_id', 's.sem', 's.section', 's.status', 's.created_at', 's.dept_id', 'd.dept_name')
+      .select(
+        's.session_id', 's.sem', 's.section', 's.status', 's.created_at', 's.dept_id', 'd.dept_name',
+        db.raw(`(
+          SELECT COUNT(*) FROM global_students st 
+          WHERE UPPER(st.dept_id) = UPPER(s.dept_id) 
+            AND st.sem = s.sem 
+            AND UPPER(TRIM(st.section)) = UPPER(TRIM(s.section))
+        ) as total_students`),
+        db.raw(`(
+          SELECT COALESCE(
+            NULLIF((SELECT COUNT(*) FROM global_students st WHERE st.session_id = s.session_id AND st.feedback_given = 'done'), 0),
+            (SELECT COALESCE(MAX(ROUND(sc.ratings_count / NULLIF((SELECT COUNT(*) FROM global_feedback_questions q WHERE UPPER(q.dept_id) = UPPER(s.dept_id)), 0))), 0)
+             FROM global_faculty_scorecards sc WHERE sc.session_id = s.session_id AND UPPER(sc.dept_id) = UPPER(s.dept_id)),
+            0
+          )
+        ) as completed_students`)
+      )
       .orderBy('s.created_at', 'desc');
-    res.json(rows);
+
+    const enriched = rows.map(s => {
+      const total = parseInt(s.total_students, 10) || 0;
+      const completed = parseInt(s.completed_students, 10) || 0;
+      const turnout_pct = total > 0 ? parseFloat(((completed / total) * 100).toFixed(1)) : 0;
+      return {
+        ...s,
+        total_students: total,
+        completed_students: completed,
+        turnout_pct
+      };
+    });
+
+    res.json(enriched);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -173,13 +208,21 @@ const toggleDepartmentStatus = async (req, res) => {
 
 const resetDepartmentFeedback = async (req, res) => {
   const { dept_id } = req.params;
+  const { role, dept_id: session_dept_id } = req.session || {};
+  const cleanDept = String(dept_id).trim().toUpperCase();
+
+  // Tenant Isolation: Department accounts cannot wipe other departments' feedback
+  if (role === 'department' && (!session_dept_id || session_dept_id.toUpperCase() !== cleanDept)) {
+    return res.status(403).json({ error: "Forbidden: You cannot reset feedback data for another department." });
+  }
+
   const trx = await db.transaction();
   try {
-    await trx('global_student_feedback').where({ dept_id }).del();
-    await trx('global_students').where({ dept_id }).whereNotNull('session_id').update({ feedback_given: 'missing' });
+    await trx('global_student_feedback').whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
+    await trx('global_students').whereRaw('UPPER(dept_id) = ?', [cleanDept]).whereNotNull('session_id').update({ feedback_given: 'missing' });
 
     await trx.commit();
-    await logActivity(req, dept_id, 'DELETE', 'SESSION', `Wiped all feedback data for department ${dept_id}`);
+    await logActivity(req, cleanDept, 'DELETE', 'SESSION', `Wiped all feedback data for department ${cleanDept}`);
     
     res.json({ message: "Department feedback data successfully reset." });
   } catch (err) {
@@ -191,17 +234,25 @@ const resetDepartmentFeedback = async (req, res) => {
 
 const resetDepartmentFaculty = async (req, res) => {
   const { dept_id } = req.params;
+  const { role, dept_id: session_dept_id } = req.session || {};
+  const cleanDept = String(dept_id).trim().toUpperCase();
+
+  // Tenant Isolation: Department accounts cannot wipe other departments' faculty
+  if (role === 'department' && (!session_dept_id || session_dept_id.toUpperCase() !== cleanDept)) {
+    return res.status(403).json({ error: "Forbidden: You cannot reset faculty data for another department." });
+  }
+
   const trx = await db.transaction();
   try {
-    await trx('global_student_feedback').where({ dept_id }).del();
-    await trx('global_assign').where({ dept_id }).del();
-    await trx('global_faculty_notes').where({ dept_id }).del();
-    await trx('global_faculty').where({ dept_id }).del();
-    await trx('global_directory').where({ role: 'faculty', dept_id }).del();
-    await trx('global_pending_faculty_registrations').where({ dept_id }).del();
+    await trx('global_student_feedback').whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
+    await trx('global_assign').whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
+    await trx('global_faculty_notes').whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
+    await trx('global_faculty').whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
+    await trx('global_directory').where({ role: 'faculty' }).whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
+    await trx('global_pending_faculty_registrations').whereRaw('UPPER(dept_id) = ?', [cleanDept]).del();
 
     await trx.commit();
-    await logActivity(req, dept_id, 'DELETE', 'FACULTY', `Wiped all faculty data for department ${dept_id}`);
+    await logActivity(req, cleanDept, 'DELETE', 'FACULTY', `Wiped all faculty data for department ${cleanDept}`);
     
     res.json({ message: "Department faculty data successfully reset." });
   } catch (err) {
@@ -214,9 +265,16 @@ const resetDepartmentFaculty = async (req, res) => {
 const getDepartmentLogs = async (req, res) => {
   const { dept_id } = req.params;
   const { action, search, limit = 100 } = req.query;
+  const { role, dept_id: session_dept_id } = req.session || {};
+
+  const cleanDept = String(dept_id).trim().toUpperCase();
+
+  // Tenant Isolation: Department accounts can strictly only read their own audit logs
+  if (role === 'department' && (!session_dept_id || session_dept_id.toUpperCase() !== cleanDept)) {
+    return res.status(403).json({ error: "Forbidden: Cross-department log access is strictly prohibited." });
+  }
 
   try {
-    const cleanDept = String(dept_id).trim().toUpperCase();
     let query = db('global_department_activity_logs')
       .whereRaw('UPPER(dept_id) = ?', [cleanDept]);
 
@@ -225,7 +283,7 @@ const getDepartmentLogs = async (req, res) => {
     }
 
     if (search && search.trim() !== '') {
-      const s = `%${search.trim()}%`;
+      const s = `%${escapeSqlLike(search.trim())}%`;
       query = query.andWhere(builder => {
         builder.where('description', 'like', s)
           .orWhere('entity', 'like', s)
@@ -260,14 +318,24 @@ const getDepartmentLogs = async (req, res) => {
 const changeDepartmentPassword = async (req, res) => {
   const { dept_id } = req.params;
   const { currentPassword, newPassword } = req.body;
-  const { role, dept_id: session_dept_id } = req.session;
+  const { role, dept_id: session_dept_id } = req.session || {};
 
-  if (role !== 'admin' && session_dept_id !== dept_id) {
+  const normParamDept = String(dept_id || '').trim().toUpperCase();
+  const normSessionDept = String(session_dept_id || '').trim().toUpperCase();
+
+  if (role !== 'admin' && normSessionDept !== normParamDept) {
     return res.status(403).json({ error: "Unauthorized access" });
   }
 
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters long." });
+  }
+
+  // Pin target department to session_dept_id for department roles to prevent any parameter tampering
+  const targetDeptId = role === 'admin' ? dept_id : session_dept_id;
+
   try {
-    const department = await db('department').where({ dept_id }).first();
+    const department = await db('department').where({ dept_id: targetDeptId }).first();
     if (!department) return res.status(404).json({ error: "Department not found" });
 
     // If department, require current password verification
@@ -277,20 +345,16 @@ const changeDepartmentPassword = async (req, res) => {
       if (!isMatch) return res.status(401).json({ error: "Incorrect current password." });
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "New password must be at least 6 characters long." });
-    }
-
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(newPassword, salt);
 
-    await db('department').where({ dept_id }).update({ password: hash });
+    await db('department').where({ dept_id: targetDeptId }).update({ password: hash });
     
     // Log activity
     if (role === 'department') {
-       await logActivity(req, dept_id, 'UPDATE', 'SECURITY', "Department password was changed.");
+       await logActivity(req, targetDeptId, 'UPDATE', 'SECURITY', "Department password was changed.");
     } else {
-       await logActivity(req, dept_id, 'UPDATE', 'SECURITY', "Password was reset by System Admin.");
+       await logActivity(req, targetDeptId, 'UPDATE', 'SECURITY', "Password was reset by System Admin.");
     }
 
     res.json({ success: true, message: "Password updated successfully." });
@@ -315,7 +379,8 @@ const purgeDepartmentData = async (req, res) => {
       await trx('global_sessions').where({ dept_id }).del();
       await trx('global_faculty').where({ dept_id }).del();
       await trx('global_directory').where({ dept_id }).del();
-      await trx('global_department_activity_logs').where({ dept_id }).del();
+      // SECURITY & AUDIT COMPLIANCE: Preserve global_department_activity_logs for forensic immutability
+      // Audit logs are intentionally retained so security investigations and compliance trails remain intact.
       await trx('global_session_remarks').where({ dept_id }).del();
       await trx('global_faculty_remarks').where({ dept_id }).del().catch(() => {});
       await trx('global_course').where({ dept_id }).del();
@@ -416,7 +481,7 @@ const getAdminAuditLogs = async (req, res) => {
     }
 
     if (search && search.trim() !== '') {
-      const s = `%${search.trim()}%`;
+      const s = `%${escapeSqlLike(search.trim())}%`;
       query = query.andWhere(builder => {
         builder.where('description', 'like', s)
           .orWhere('entity', 'like', s)

@@ -38,6 +38,8 @@ const getStudentSubjects = async (req, res) => {
         'c.course_code as course_id',
         'f.faculty_id',
         'f.name as faculty_name',
+        'f.profile_picture_url',
+        'f.position as designation',
         'a.section',
         'a.sem'
       );
@@ -72,11 +74,18 @@ const submitFeedback = async (req, res) => {
   if (!session_id || !Array.isArray(facultyList) || !idempotency_key) {
     return res.status(400).json({ error: "Missing required data" });
   }
+
+  // Strict BOLA Defense: Verify client-supplied session_id matches student's authenticated session
+  if (student_session_id && String(session_id).trim() !== String(student_session_id).trim()) {
+    return res.status(403).json({ error: "Forbidden: Cross-session submission prohibited" });
+  }
   
-  const student = { usn, session_id: student_session_id, dept_id };
+  const effectiveSessionId = student_session_id || session_id;
+  const verifiedSessionId = effectiveSessionId;
+  const student = { usn, session_id: verifiedSessionId, dept_id };
   
   // Enforce department-configured minimum dwell time (if > 0)
-  const sessionRecord = await db('global_sessions').where({ session_id }).first();
+  const sessionRecord = await db('global_sessions').where({ session_id: effectiveSessionId }).first();
   const deptRecord = sessionRecord ? await db('department').where({ dept_id: sessionRecord.dept_id }).first() : null;
   const minTimeSec = deptRecord?.feedback_min_time_sec != null ? Number(deptRecord.feedback_min_time_sec) : 300;
 
@@ -115,7 +124,7 @@ const submitFeedback = async (req, res) => {
     // 2. MICRO-SYNCHRONOUS LOCK: Update student status instantly without SELECT FOR UPDATE
     const updateResult = await db('global_students')
       .where({ usn: student.usn, dept_id, feedback_given: 'pending' })
-      .update({ session_id, feedback_given: 'done' });
+      .update({ session_id: verifiedSessionId, feedback_given: 'done' });
 
     if (updateResult === 0) {
       // Either student not found, or they already submitted
@@ -212,8 +221,17 @@ const submitFeedback = async (req, res) => {
     }
 
     // 4. INSTANT RESPONSE: Unblock the student's UI completely. 
-    // They are fully logged out and recorded as 'done'.
-    res.json({ message: "Feedback submitted successfully" });
+    // Secure terminal cleanup: Immediately destroy student session and clear session cookie
+    if (req.session) {
+      req.session.destroy((destroyErr) => {
+        if (destroyErr) console.error("Session destroy error on feedback submit:", destroyErr);
+        res.clearCookie('connect.sid');
+        res.json({ message: "Feedback submitted successfully" });
+      });
+    } else {
+      res.clearCookie('connect.sid');
+      res.json({ message: "Feedback submitted successfully" });
+    }
 
     // 5. ASYNCHRONOUS HEAVY INGESTION QUEUE WORKER
     setTimeout(async () => {
@@ -249,7 +267,7 @@ const submitFeedback = async (req, res) => {
         
         // Notify realtime dashboards
         const io = req.app.get('io');
-        if (io) io.emit("NEW_FEEDBACK_RECEIVED", { dept_id });
+        if (io) io.emit("NEW_FEEDBACK_RECEIVED", { dept_id, session_id });
 
         await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${session_id} (${ratingsToInsert.length} ratings processed)`, 'SUCCESS');
 
@@ -342,6 +360,14 @@ const bulkUploadQuestions = async (req, res) => {
     return res.status(400).json({ error: "Invalid payload" });
   }
   if (!dept_id) return res.status(400).json({ error: "Department ID required" });
+
+  if (req.session?.role === 'department' && req.session.dept_id && dept_id !== req.session.dept_id.toUpperCase()) {
+    return res.status(403).json({ error: "Unauthorized: Cannot bulk upload questions for another department." });
+  }
+
+  if (questions.length > 500) {
+    return res.status(400).json({ error: "Batch size exceeds maximum limit of 500 records per upload." });
+  }
 
   try {
     let insertedCount = 0;

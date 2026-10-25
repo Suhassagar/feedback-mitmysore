@@ -15,6 +15,7 @@ import {
 import PageTransition from "../components/PageTransition";
 import { jumbleQuestionsForStudent } from "../utils/shuffleUtils";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import "./FeedbackForm.css";
 
 const QUICK_FEEDBACK_OPTIONS = [
   "Teaching pace too fast",
@@ -24,6 +25,51 @@ const QUICK_FEEDBACK_OPTIONS = [
   "More interactive discussions needed",
   "Additional study materials required"
 ];
+
+// Helper to extract clean initials from faculty names (handles Dr., Prof., etc.)
+function getFacultyInitials(name) {
+  if (!name || typeof name !== 'string') return 'F';
+  const cleanName = name.replace(/^(dr\.?|prof\.?|mr\.?|mrs\.?|ms\.?)\s+/i, '').trim();
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return name.charAt(0).toUpperCase();
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Clean Faculty Avatar Component with Fail-Safe Initials Fallback
+function FacultyAvatar({ photoUrl, name, size = 56, className = "" }) {
+  const [imgError, setImgError] = useState(false);
+  const initials = getFacultyInitials(name);
+
+  // Reset error state if current faculty/photoUrl changes during wizard step navigation
+  useEffect(() => {
+    setImgError(false);
+  }, [photoUrl]);
+
+  const hasValidPhoto = Boolean(photoUrl && typeof photoUrl === 'string' && photoUrl.trim() !== '' && !imgError);
+
+  return (
+    <div 
+      className={`eval-faculty-avatar-container ${className}`}
+      style={{ width: `${size}px`, height: `${size}px`, minWidth: `${size}px` }}
+      aria-label={`Profile photo of ${name || 'Faculty'}`}
+    >
+      {hasValidPhoto ? (
+        <img
+          src={photoUrl}
+          alt={name || "Faculty Member"}
+          className="eval-faculty-avatar-img"
+          onError={() => setImgError(true)}
+          loading="lazy"
+        />
+      ) : (
+        <div className="eval-faculty-avatar-fallback">
+          <span>{initials}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FeedbackForm() {
   const location = useLocation();
@@ -281,8 +327,7 @@ export default function FeedbackForm() {
             margin: "0 auto 12px auto"
           }} />
           <p style={{ fontSize: "14px", fontWeight: "500" }}>Loading Course Evaluation Form...</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
+                  </div>
       </div>
     );
   }
@@ -311,669 +356,6 @@ export default function FeedbackForm() {
   return (
     <PageTransition>
       <div className="theme-student eval-page-container">
-        <style>
-          {`
-            /* ============================================================ */
-            /* INSTITUTIONAL COURSE EVALUATION PORTAL (STUDENT THEME)       */
-            /* ============================================================ */
-            
-            .eval-page-container {
-              --primary: #EA580C;
-              --gold2: #C2410C;
-              --bg-light: #FFF7ED;
-              --bg-hover: #FFEDD5;
-              --focus-ring: rgba(234, 88, 12, 0.2);
-              min-height: 100vh;
-              background-color: #F8FAFC;
-              color: #0F172A;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-              padding: 0;
-              margin: 0;
-              line-height: 1.5;
-            }
-
-            /* Sticky Institutional Header Bar */
-            .eval-header-bar {
-              position: sticky;
-              top: 0;
-              z-index: 40;
-              background: #FFFFFF;
-              border-bottom: 1px solid #E2E8F0;
-              padding: 10px 20px;
-              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-            }
-
-            .eval-header-inner {
-              max-width: 860px;
-              margin: 0 auto;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              gap: 16px;
-            }
-
-            .eval-brand-group {
-              display: flex;
-              align-items: center;
-              gap: 12px;
-            }
-
-            .eval-college-logo {
-              height: 38px;
-              width: auto;
-              border-radius: 4px;
-              display: block;
-            }
-
-            .eval-title-block {
-              display: flex;
-              flex-direction: column;
-            }
-
-            .eval-college-name {
-              font-size: 13.5px;
-              font-weight: 700;
-              color: #0F172A;
-              letter-spacing: -0.01em;
-              margin: 0;
-              line-height: 1.25;
-            }
-
-            .eval-portal-name {
-              font-size: 11.5px;
-              color: #64748B;
-              margin: 0;
-            }
-
-            .eval-header-meta {
-              display: flex;
-              align-items: center;
-              gap: 12px;
-            }
-
-            .eval-step-badge {
-              font-size: 12px;
-              font-weight: 600;
-              color: #C2410C;
-              background: #FFF7ED;
-              border: 1px solid #FED7AA;
-              padding: 4px 10px;
-              border-radius: 6px;
-              white-space: nowrap;
-            }
-
-            .eval-confidential-tag {
-              display: inline-flex;
-              align-items: center;
-              gap: 4px;
-              font-size: 11.5px;
-              color: #C2410C;
-              font-weight: 600;
-              background: #FFF7ED;
-              border: 1px solid #FED7AA;
-              padding: 3px 8px;
-              border-radius: 4px;
-              white-space: nowrap;
-            }
-
-            .eval-progress-bar-track {
-              height: 3px;
-              width: 100%;
-              background: #E2E8F0;
-            }
-
-            .eval-progress-bar-fill {
-              height: 100%;
-              background: #EA580C;
-              transition: width 0.3s ease;
-            }
-
-            /* Main Form Canvas */
-            .eval-main-wrapper {
-              max-width: 860px;
-              margin: 0 auto;
-              padding: 20px 20px 80px 20px;
-            }
-
-            /* Faculty Information Card */
-            .eval-faculty-card {
-              background: #FFFFFF;
-              border: 1px solid #E2E8F0;
-              border-radius: 8px;
-              padding: 16px 20px;
-              margin-bottom: 20px;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              flex-wrap: wrap;
-              gap: 12px;
-              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-            }
-
-            .eval-course-tag {
-              display: inline-flex;
-              align-items: center;
-              gap: 6px;
-              font-size: 12px;
-              font-weight: 600;
-              color: #C2410C;
-              background: #FFF7ED;
-              border: 1px solid #FED7AA;
-              padding: 2px 8px;
-              border-radius: 4px;
-              margin-bottom: 4px;
-            }
-
-            .eval-faculty-name {
-              font-size: 17px;
-              font-weight: 700;
-              color: #0F172A;
-              margin: 0 0 2px 0;
-            }
-
-            .eval-faculty-id {
-              font-size: 12px;
-              color: #64748B;
-              margin: 0;
-            }
-
-            .eval-completion-counter {
-              font-size: 13px;
-              font-weight: 600;
-              display: inline-flex;
-              align-items: center;
-              gap: 6px;
-              padding: 5px 12px;
-              border-radius: 6px;
-              background: #F8FAFC;
-              border: 1px solid #E2E8F0;
-              color: #475569;
-            }
-
-            .eval-completion-counter.done {
-              background: #FFF7ED;
-              border-color: #FED7AA;
-              color: #C2410C;
-            }
-
-            /* Section Card */
-            .eval-section-panel {
-              background: #FFFFFF;
-              border: 1px solid #E2E8F0;
-              border-radius: 8px;
-              margin-bottom: 20px;
-              overflow: hidden;
-              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-            }
-
-            .eval-section-header {
-              background: #F8FAFC;
-              border-bottom: 1px solid #E2E8F0;
-              padding: 12px 18px;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              flex-wrap: wrap;
-              gap: 8px;
-            }
-
-            .eval-section-title {
-              font-size: 14px;
-              font-weight: 700;
-              color: #1E293B;
-              margin: 0;
-            }
-
-            .eval-section-score {
-              font-size: 12px;
-              font-weight: 600;
-              color: #475569;
-            }
-
-            .eval-scale-legend-bar {
-              padding: 7px 18px;
-              background: #FAFAFA;
-              border-bottom: 1px solid #F1F5F9;
-              font-size: 11.5px;
-              color: #64748B;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-            }
-
-            /* Question List */
-            .eval-question-table {
-              padding: 0;
-              margin: 0;
-              list-style: none;
-            }
-
-            .eval-question-item {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              gap: 20px;
-              padding: 14px 18px;
-              border-bottom: 1px solid #F1F5F9;
-            }
-
-            .eval-question-item:last-child {
-              border-bottom: none;
-            }
-
-            .eval-question-text {
-              flex: 1 1 360px;
-              font-size: 13.5px;
-              font-weight: 500;
-              color: #1E293B;
-              line-height: 1.45;
-              display: flex;
-              align-items: flex-start;
-              gap: 10px;
-            }
-
-            .eval-q-num {
-              color: #64748B;
-              font-weight: 600;
-              min-width: 22px;
-            }
-
-            /* Rating Buttons (Student Orange Uniform Theme) */
-            .eval-rating-group {
-              flex-shrink: 0;
-              display: grid;
-              grid-template-columns: repeat(5, 1fr);
-              gap: 6px;
-              width: 240px;
-            }
-
-            .eval-rating-btn {
-              height: 38px;
-              border-radius: 6px;
-              font-size: 13.5px;
-              font-weight: 600;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-              background: #FFFFFF;
-              border: 1px solid #D1D5DB;
-              color: #374151;
-              transition: all 0.15s ease;
-              user-select: none;
-              touch-action: manipulation;
-            }
-
-            .eval-rating-btn:hover {
-              background: #FFF7ED;
-              border-color: #FDBA74;
-              color: var(--primary, #EA580C);
-            }
-
-            .eval-rating-btn.selected {
-              background: var(--primary, #EA580C);
-              border-color: var(--primary, #EA580C);
-              color: #FFFFFF;
-              font-weight: 700;
-              box-shadow: 0 1px 3px rgba(234, 88, 12, 0.35);
-            }
-
-            /* Contextual Low-Score Panel */
-            .eval-low-score-box {
-              background: #FFFDFB;
-              border-top: 1px solid #FED7AA;
-              padding: 14px 18px;
-            }
-
-            .eval-low-score-heading {
-              font-size: 12.5px;
-              font-weight: 600;
-              color: #9A3412;
-              margin: 0 0 3px 0;
-            }
-
-            .eval-low-score-desc {
-              font-size: 11.5px;
-              color: #7C2D12;
-              margin: 0 0 10px 0;
-            }
-
-            .eval-chips-row {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 6px;
-              margin-bottom: 10px;
-            }
-
-            .eval-chip-btn {
-              background: #FFFFFF;
-              border: 1px solid #FED7AA;
-              color: #9A3412;
-              font-size: 12px;
-              font-weight: 500;
-              padding: 5px 11px;
-              border-radius: 6px;
-              cursor: pointer;
-              display: inline-flex;
-              align-items: center;
-              gap: 5px;
-              transition: all 0.15s ease;
-            }
-
-            .eval-chip-btn:hover {
-              background: #FFF7ED;
-              border-color: #FDBA74;
-            }
-
-            .eval-chip-btn.active {
-              background: var(--primary, #EA580C);
-              border-color: var(--primary, #EA580C);
-              color: #FFFFFF;
-              font-weight: 600;
-            }
-
-            .eval-input-text {
-              width: 100%;
-              border: 1px solid #D1D5DB;
-              border-radius: 6px;
-              padding: 8px 12px;
-              font-size: 13.5px;
-              font-family: inherit;
-              box-sizing: border-box;
-              background: #FFFFFF;
-              color: #0F172A;
-              resize: vertical;
-            }
-
-            .eval-input-text:focus {
-              outline: none;
-              border-color: var(--primary, #EA580C);
-              box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.18);
-            }
-
-            /* Remarks Box */
-            .eval-remark-container {
-              background: #FFFFFF;
-              border: 1px solid #E2E8F0;
-              border-radius: 8px;
-              padding: 16px 18px;
-              margin-bottom: 24px;
-            }
-
-            .eval-remark-label {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              font-size: 13px;
-              font-weight: 600;
-              color: #1E293B;
-              margin-bottom: 8px;
-            }
-
-            /* Final Step Review Card */
-            .eval-final-card {
-              background: #FFFFFF;
-              border: 1px solid #E2E8F0;
-              border-radius: 8px;
-              padding: 24px 20px;
-              margin-bottom: 24px;
-            }
-
-            .eval-final-title {
-              font-size: 16px;
-              font-weight: 700;
-              color: #0F172A;
-              margin: 0 0 6px 0;
-            }
-
-            .eval-final-sub {
-              font-size: 13px;
-              color: #64748B;
-              margin: 0 0 18px 0;
-              line-height: 1.5;
-            }
-
-            .eval-summary-list {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-              gap: 8px;
-              margin-bottom: 20px;
-            }
-
-            .eval-summary-item {
-              background: #F8FAFC;
-              border: 1px solid #E2E8F0;
-              border-radius: 6px;
-              padding: 10px 12px;
-              display: flex;
-              align-items: center;
-              gap: 10px;
-            }
-
-            .eval-summary-check {
-              width: 20px;
-              height: 20px;
-              border-radius: 50%;
-              background: #FFF7ED;
-              color: #EA580C;
-              border: 1px solid #FED7AA;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              flex-shrink: 0;
-            }
-
-            /* Action Buttons */
-            .eval-action-bar {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              gap: 14px;
-              margin-top: 24px;
-            }
-
-            .eval-btn-back {
-              height: 40px;
-              padding: 0 20px;
-              border: 1px solid #D1D5DB;
-              background: #FFFFFF;
-              color: #374151;
-              border-radius: 6px;
-              font-size: 13.5px;
-              font-weight: 500;
-              display: inline-flex;
-              align-items: center;
-              gap: 6px;
-              cursor: pointer;
-              transition: all 0.15s ease;
-            }
-
-            .eval-btn-back:hover:not(:disabled) {
-              background: #F3F4F6;
-              border-color: #9CA3AF;
-            }
-
-            .eval-btn-back:disabled {
-              opacity: 0.4;
-              cursor: not-allowed;
-            }
-
-            .eval-btn-primary {
-              height: 40px;
-              padding: 0 24px;
-              background: #EA580C !important;
-              color: #FFFFFF !important;
-              border: 1px solid #EA580C !important;
-              border-radius: 6px;
-              font-size: 13.5px;
-              font-weight: 600;
-              display: inline-flex;
-              align-items: center;
-              gap: 8px;
-              cursor: pointer;
-              transition: all 0.15s ease;
-            }
-
-            .eval-btn-primary:hover:not(.disabled-timer) {
-              background: #C2410C !important;
-              border-color: #C2410C !important;
-            }
-
-            .eval-btn-primary.disabled-timer {
-              background: #F8FAFC !important;
-              border-color: #E2E8F0 !important;
-              color: #94A3B8 !important;
-              cursor: not-allowed;
-            }
-
-            /* ============================================================ */
-            /* MOBILE RESPONSIVE OPTIMIZATIONS (Max-Width 768px)            */
-            /* ============================================================ */
-            @media (max-width: 768px) {
-              .eval-main-wrapper {
-                padding: 14px 12px 70px 12px;
-              }
-
-              .eval-header-bar {
-                padding: 10px 12px;
-              }
-
-              .eval-college-logo {
-                height: 32px;
-              }
-
-              .eval-college-name {
-                font-size: 12.5px;
-              }
-
-              .eval-portal-name {
-                font-size: 11px;
-              }
-
-              .eval-confidential-tag {
-                display: none; /* Keep header compact on small screens */
-              }
-
-              .eval-faculty-card {
-                padding: 14px;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-              }
-
-              .eval-completion-counter {
-                width: 100%;
-                justify-content: center;
-              }
-
-              .eval-section-panel {
-                border-radius: 6px;
-                margin-bottom: 14px;
-              }
-
-              .eval-section-header {
-                padding: 10px 14px;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
-              }
-
-              .eval-scale-legend-bar {
-                padding: 6px 14px;
-                font-size: 11px;
-              }
-
-              .eval-question-item {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 12px;
-                padding: 14px;
-              }
-
-              .eval-question-text {
-                flex: none;
-                width: 100%;
-                font-size: 13.5px;
-              }
-
-              .eval-rating-group {
-                width: 100%;
-                gap: 6px;
-              }
-
-              .eval-rating-btn {
-                height: 36px;
-                font-size: 13.5px;
-                border-radius: 6px;
-              }
-
-              .eval-low-score-box {
-                padding: 12px 14px;
-              }
-
-              .eval-chips-row {
-                gap: 6px;
-              }
-
-              .eval-chip-btn {
-                flex: 1 1 45%;
-                justify-content: center;
-                text-align: center;
-                padding: 6px 10px;
-                font-size: 11.5px;
-              }
-
-              .eval-summary-list {
-                grid-template-columns: 1fr;
-              }
-
-              /* Compact & Refined Mobile Bottom Bar */
-              .eval-action-bar {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 50;
-                margin-top: 0;
-                padding: 8px 16px;
-                padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
-                background: #FFFFFF;
-                border-top: 1px solid #E2E8F0;
-                box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.04);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-              }
-
-              .eval-btn-back {
-                height: 36px;
-                padding: 0 14px;
-                border-radius: 6px;
-                font-size: 13px;
-                font-weight: 500;
-                flex-shrink: 0;
-              }
-
-              .eval-btn-primary {
-                height: 36px;
-                padding: 0 18px;
-                border-radius: 6px;
-                font-size: 13px;
-                font-weight: 600;
-                flex: 0 0 auto; /* Natural content width, no stretching! */
-                justify-content: center;
-              }
-
-              .eval-rating-btn:active,
-              .eval-chip-btn:active,
-              .eval-btn-primary:active,
-              .eval-btn-back:active {
-                transform: scale(0.97);
-              }
-            }
-          `}
-        </style>
-
         {/* INSTITUTIONAL HEADER BAR */}
         <header className="eval-header-bar">
           <div className="eval-header-inner">
@@ -1004,15 +386,28 @@ export default function FeedbackForm() {
         <main className="eval-main-wrapper">
           {!isFinalStep && currentFaculty && (
             <div>
-              {/* Faculty Information Card */}
+              {/* Faculty Information Card with Photo Avatar */}
               <div className="eval-faculty-card">
-                <div>
-                  <div className="eval-course-tag">
-                    <BookOpen size={13} />
-                    <span>{currentFaculty.course_id} — {currentFaculty.course_name}</span>
+                <div className="eval-faculty-profile-group">
+                  <FacultyAvatar 
+                    photoUrl={currentFaculty.profile_picture_url} 
+                    name={currentFaculty.faculty_name} 
+                    size={56} 
+                  />
+                  <div className="eval-faculty-meta">
+                    <div className="eval-course-tag">
+                      <BookOpen size={13} />
+                      <span>{currentFaculty.course_id} — {currentFaculty.course_name}</span>
+                    </div>
+                    <h2 className="eval-faculty-name">{currentFaculty.faculty_name}</h2>
+                    <div className="eval-faculty-subtext">
+                      {currentFaculty.designation && (
+                        <span className="eval-faculty-designation">{currentFaculty.designation}</span>
+                      )}
+                      {currentFaculty.designation && <span className="eval-faculty-dot">•</span>}
+                      <span className="eval-faculty-id">Faculty ID: {currentFaculty.faculty_id}</span>
+                    </div>
                   </div>
-                  <h2 className="eval-faculty-name">{currentFaculty.faculty_name}</h2>
-                  <p className="eval-faculty-id">Faculty ID: {currentFaculty.faculty_id}</p>
                 </div>
 
                 <div className={`eval-completion-counter ${isCurrentFacultyComplete ? "done" : ""}`}>
@@ -1180,6 +575,12 @@ export default function FeedbackForm() {
                     <div className="eval-summary-check">
                       <Check size={12} />
                     </div>
+                    <FacultyAvatar 
+                      photoUrl={fac.profile_picture_url} 
+                      name={fac.faculty_name} 
+                      size={28} 
+                      className="eval-summary-avatar"
+                    />
                     <div style={{ overflow: "hidden" }}>
                       <div style={{ fontSize: "13px", fontWeight: "600", color: "#0F172A", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                         {fac.faculty_name}

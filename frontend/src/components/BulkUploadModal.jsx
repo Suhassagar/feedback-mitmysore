@@ -40,16 +40,27 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
     reader.onload = (evt) => {
       try {
         const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const wb = XLSX.read(bstr, { 
+          type: "binary",
+          cellFormula: false,
+          cellHTML: false,
+          cellStyles: false
+        });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         
         let rawData = XLSX.utils.sheet_to_json(ws, { raw: false });
+        const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
         
         let normalizedData = rawData.map(row => {
           let newRow = {};
+          if (!row || typeof row !== 'object') return newRow;
           Object.keys(row).forEach(key => {
-            newRow[key.trim().toLowerCase()] = typeof row[key] === "string" ? row[key].trim() : row[key];
+            const cleanKey = key.trim().toLowerCase();
+            if (DANGEROUS_KEYS.includes(cleanKey)) return;
+            if (Object.prototype.hasOwnProperty.call(row, key)) {
+              newRow[cleanKey] = typeof row[key] === "string" ? row[key].trim() : row[key];
+            }
           });
           
           if (type === "students") {
@@ -152,6 +163,10 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+            role="button"
+            tabIndex={0}
+            aria-label="Upload Excel or CSV spreadsheet file"
             style={{
               border: `2px dashed ${isDragging ? "var(--primary)" : "var(--border-color)"}`,
               borderRadius: "12px",
@@ -165,7 +180,14 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
             <UploadCloud size={48} color={isDragging ? "var(--primary)" : "var(--text-secondary)"} style={{ marginBottom: "16px" }} />
             <h3 style={{ margin: "0 0 8px 0", color: "var(--text-primary)", fontSize: "16px" }}>Drag & Drop your Excel or CSV file here</h3>
             <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "14px" }}>or click to browse from your computer</p>
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv, .xlsx, .xls" style={{ display: "none" }} />
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              accept=".csv, .xlsx, .xls" 
+              aria-label="Choose spreadsheet file"
+              style={{ display: "none" }} 
+            />
           </div>
         )}
 

@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
-const { logActivity } = require('../utils/logger');
+const { logActivity, logSecurityAlert } = require('../utils/logger');
 
 const adminLogin = async (req, res) => {
   let { username, password } = req.body;
@@ -13,11 +13,17 @@ const adminLogin = async (req, res) => {
     if (adminRows.length > 0) {
       const isMatch = await bcrypt.compare(password, adminRows[0].password);
       if (isMatch) { 
-        req.session.role = 'admin';
-        req.session.username = username;
-        req.session.name = 'Administrator';
-        await logActivity(req, 'ADMIN', 'LOGIN', 'AUTH', `System Administrator (${username}) logged in`, 'SUCCESS');
-        return res.json({ success: true, message: "Login successful" });
+        return req.session.regenerate(async (regenErr) => {
+          if (regenErr) {
+            console.error("Session regeneration error:", regenErr);
+            return res.status(500).json({ success: false, message: "Session initialization error" });
+          }
+          req.session.role = 'admin';
+          req.session.username = username;
+          req.session.name = 'Administrator';
+          await logActivity(req, 'ADMIN', 'LOGIN', 'AUTH', `System Administrator (${username}) logged in`, 'SUCCESS');
+          return res.json({ success: true, message: "Login successful" });
+        });
       }
     }
     await logActivity(req, 'ADMIN', 'FAILED_LOGIN', 'SECURITY', `Failed admin login attempt for user: ${username}`, 'FAILED');
@@ -41,26 +47,32 @@ const departmentLogin = async (req, res) => {
     }
     const isMatch = await bcrypt.compare(password, deptRows[0].password);
     if (isMatch) { 
-      req.session.role = 'department';
-      req.session.dept_id = deptRows[0].dept_id;
-      req.session.dept_name = deptRows[0].dept_name;
-      req.session.name = deptRows[0].dept_name;
-      req.session.logo_url = deptRows[0].logo_url;
-      req.session.brand_color = deptRows[0].brand_color;
-      req.session.brand_accent = deptRows[0].brand_accent;
-      req.session.logo_lqip = deptRows[0].logo_lqip;
-      
-      await logActivity(req, deptRows[0].dept_id, 'LOGIN', 'AUTH', 'Logged into the system', 'SUCCESS');
-      
-      return res.json({ 
-        success: true, 
-        message: "Login successful", 
-        dept_id: deptRows[0].dept_id, 
-        dept_name: deptRows[0].dept_name,
-        logo_url: deptRows[0].logo_url,
-        brand_color: deptRows[0].brand_color,
-        brand_accent: deptRows[0].brand_accent,
-        logo_lqip: deptRows[0].logo_lqip
+      return req.session.regenerate(async (regenErr) => {
+        if (regenErr) {
+          console.error("Session regeneration error:", regenErr);
+          return res.status(500).json({ success: false, message: "Session initialization error" });
+        }
+        req.session.role = 'department';
+        req.session.dept_id = deptRows[0].dept_id;
+        req.session.dept_name = deptRows[0].dept_name;
+        req.session.name = deptRows[0].dept_name;
+        req.session.logo_url = deptRows[0].logo_url;
+        req.session.brand_color = deptRows[0].brand_color;
+        req.session.brand_accent = deptRows[0].brand_accent;
+        req.session.logo_lqip = deptRows[0].logo_lqip;
+        
+        await logActivity(req, deptRows[0].dept_id, 'LOGIN', 'AUTH', 'Logged into the system', 'SUCCESS');
+        
+        return res.json({ 
+          success: true, 
+          message: "Login successful", 
+          dept_id: deptRows[0].dept_id, 
+          dept_name: deptRows[0].dept_name,
+          logo_url: deptRows[0].logo_url,
+          brand_color: deptRows[0].brand_color,
+          brand_accent: deptRows[0].brand_accent,
+          logo_lqip: deptRows[0].logo_lqip
+        });
       });
     }
   }
@@ -100,21 +112,33 @@ const facultyLogin = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, faculty.password);
     if (isMatch) {
+      const isDefaultPwd = (password === "Fac@2007") || Boolean(faculty.must_change_password);
       const deptIdUpper = (faculty.dept_id || '').toUpperCase();
-      req.session.role = 'faculty';
-      req.session.dept_id = deptIdUpper;
-      req.session.faculty_id = faculty.faculty_id;
-      req.session.name = faculty.name;
 
-      await logActivity(req, deptIdUpper, 'LOGIN', 'AUTH', `Faculty member ${faculty.name} (${faculty.faculty_id}) logged in`, 'SUCCESS');
-      return res.json({ 
-        success: true, 
-        message: "Login successful", 
-        faculty: { 
-          faculty_id: faculty.faculty_id, 
-          name: faculty.name, 
-          dept_id: deptIdUpper 
-        } 
+      return req.session.regenerate(async (regenErr) => {
+        if (regenErr) {
+          console.error("Session regeneration error:", regenErr);
+          return res.status(500).json({ success: false, message: "Session error during login" });
+        }
+
+        req.session.role = 'faculty';
+        req.session.dept_id = deptIdUpper;
+        req.session.faculty_id = faculty.faculty_id;
+        req.session.name = faculty.name;
+        req.session.must_change_password = isDefaultPwd;
+
+        await logActivity(req, deptIdUpper, 'LOGIN', 'AUTH', `Faculty member ${faculty.name} (${faculty.faculty_id}) logged in`, 'SUCCESS');
+        return res.json({ 
+          success: true, 
+          message: "Login successful", 
+          must_change_password: isDefaultPwd,
+          faculty: { 
+            faculty_id: faculty.faculty_id, 
+            name: faculty.name, 
+            dept_id: deptIdUpper,
+            must_change_password: isDefaultPwd
+          } 
+        });
       });
     }
 
@@ -149,27 +173,32 @@ const studentLogin = async (req, res) => {
           .onConflict('user_id')
           .merge({ dept_id, role: 'student' });
       } else {
+        await logSecurityAlert(req, 'SECURITY', 'FAILED_LOGIN', `Student login failed: USN ${usn} not found`, 'FAILED');
         return res.status(404).json({ message: "Student USN not found" });
       }
     }
     
     const students = await db('global_students').where({ usn, dept_id }).limit(1);
     if (students.length === 0) {
+      await logSecurityAlert(req, dept_id || 'SECURITY', 'FAILED_LOGIN', `Student login failed: USN ${usn} not found in department ${dept_id}`, 'FAILED');
       return res.status(404).json({ message: "Student USN not found in department" });
     }
     
     const depts = await db('department').where({ dept_id }).select('is_active').limit(1);
     if (depts.length > 0 && depts[0].is_active === 0) {
+      await logSecurityAlert(req, dept_id, 'SUSPENDED_DEPT_ACCESS', `Student login attempt for suspended department ${dept_id} by USN ${usn}`, 'FAILED');
       return res.status(403).json({ message: "Your department account has been suspended by the Admin." });
     }
     
     const sessions = await db('global_sessions').where({ session_id, dept_id }).limit(1);
     if (sessions.length === 0) {
+      await logSecurityAlert(req, dept_id, 'FAILED_LOGIN', `Student login failed: Session ${session_id} not found for department ${dept_id}`, 'FAILED');
       return res.status(404).json({ message: "Session not found" });
     }
     
     const session = sessions[0];
     if (session.status !== 'active') {
+      await logSecurityAlert(req, dept_id, 'INACTIVE_SESSION_ACCESS', `Student login attempt to inactive session ${session_id} by USN ${usn}`, 'FAILED');
       return res.status(403).json({ message: "This feedback session is not active" });
     }
 
@@ -180,6 +209,7 @@ const studentLogin = async (req, res) => {
     const sessionSec = String(session.section || '').trim().toUpperCase();
 
     if (studentSem !== sessionSem || studentSec !== sessionSec) {
+      await logSecurityAlert(req, dept_id, 'SECTION_MISMATCH_ACCESS', `Student ${usn} (Sem ${studentSem} Sec ${studentSec}) attempted access to session ${session_id} (Sem ${sessionSem} Sec ${sessionSec})`, 'FAILED');
       return res.status(403).json({ 
         message: `Access denied. This session is for Sem ${session.sem} Sec ${session.section}, but you are registered in Sem ${students[0].sem} Sec ${students[0].section}.` 
       });
@@ -194,19 +224,28 @@ const studentLogin = async (req, res) => {
         feedback_given: isAlreadyDoneThisSession ? 'done' : 'pending'
       });
     
-    req.session.role = 'student';
-    req.session.dept_id = dept_id;
-    req.session.usn = usn;
-    req.session.session_id = session_id;
-    req.session.name = students[0].name;
-    req.session.sem = students[0].sem;
-    req.session.section = students[0].section;
-    
-    res.json({ 
-      success: true, 
-      message: "Login successful", 
-      student: { usn, name: students[0].name, dept_id },
-      session: { session_id, sem: session.sem, section: session.section } 
+    return req.session.regenerate(async (regenErr) => {
+      if (regenErr) {
+        console.error("Session regeneration error:", regenErr);
+        return res.status(500).json({ success: false, message: "Session initialization error" });
+      }
+
+      req.session.role = 'student';
+      req.session.dept_id = dept_id;
+      req.session.usn = usn;
+      req.session.session_id = session_id;
+      req.session.name = students[0].name;
+      req.session.sem = students[0].sem;
+      req.session.section = students[0].section;
+
+      await logActivity(req, dept_id, 'LOGIN', 'STUDENT_AUTH', `Student ${usn} (${students[0].name}) logged in for session ${session_id} (Sem ${session.sem} Sec ${session.section})`, 'SUCCESS');
+      
+      return res.json({ 
+        success: true, 
+        message: "Login successful", 
+        student: { usn, name: students[0].name, dept_id },
+        session: { session_id, sem: session.sem, section: session.section } 
+      });
     });
   } catch (err) {
     console.error("Student Login Error:", err);
@@ -251,14 +290,22 @@ const checkSession = async (req, res) => {
     let brand_accent = req.session.brand_accent;
     let logo_lqip = req.session.logo_lqip;
     
-    // Auto-fill or refresh dept details for active sessions
+    // Auto-fill or refresh dept details for active sessions & check department active status
     if (req.session.dept_id) {
       try {
         const d = await db('department')
           .where({ dept_id: req.session.dept_id })
-          .select('dept_name', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip')
+          .select('dept_name', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip', 'is_active')
           .first();
         if (d) {
+          // Check if department is inactive/suspended
+          if (d.is_active === 0 || d.is_active === false) {
+            return req.session.destroy(() => {
+              res.clearCookie('connect.sid');
+              return res.status(403).json({ success: false, message: "Department account has been deactivated. Contact Admin." });
+            });
+          }
+
           dept_name = d.dept_name;
           logo_url = d.logo_url;
           brand_color = d.brand_color;
@@ -273,12 +320,55 @@ const checkSession = async (req, res) => {
         } else if (req.session.role === 'department') {
           // Department was completely removed from the database!
           return req.session.destroy(() => {
-            res.json({ success: false, message: "Department no longer exists. Please log in again." });
+            res.clearCookie('connect.sid');
+            return res.status(401).json({ success: false, message: "Department no longer exists. Please log in again." });
           });
         }
       } catch (e) {
         console.error("Failed to fetch dept details for session:", e);
         dept_name = "Unknown Department";
+      }
+    }
+
+    // Verify faculty active status & account existence
+    if (req.session.role === 'faculty' && req.session.faculty_id) {
+      try {
+        const f = await db('global_faculty')
+          .where({ faculty_id: req.session.faculty_id })
+          .select('is_active')
+          .first();
+        if (!f) {
+          return req.session.destroy(() => {
+            res.clearCookie('connect.sid');
+            return res.status(401).json({ success: false, message: "Faculty account no longer exists." });
+          });
+        }
+        if (f.is_active === 0 || f.is_active === false) {
+          return req.session.destroy(() => {
+            res.clearCookie('connect.sid');
+            return res.status(403).json({ success: false, message: "Your account has been deactivated. Please contact your Department." });
+          });
+        }
+      } catch (e) {
+        console.error("Failed to verify faculty status for session:", e);
+      }
+    }
+
+    // Verify admin account existence
+    if (req.session.role === 'admin' && req.session.username) {
+      try {
+        const a = await db('admin')
+          .where({ username: req.session.username })
+          .select('id')
+          .first();
+        if (!a) {
+          return req.session.destroy(() => {
+            res.clearCookie('connect.sid');
+            return res.status(401).json({ success: false, message: "Admin account no longer exists." });
+          });
+        }
+      } catch (e) {
+        console.error("Failed to verify admin status for session:", e);
       }
     }
 
@@ -291,6 +381,7 @@ const checkSession = async (req, res) => {
         dept_id: req.session.dept_id,
         dept_name: dept_name || req.session.dept_id,
         faculty_id: req.session.faculty_id,
+        must_change_password: Boolean(req.session.must_change_password),
         usn: req.session.usn,
         sem: req.session.sem,
         section: req.session.section,

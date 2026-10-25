@@ -41,11 +41,38 @@ import ManageQuestions from "./pages/ManageQuestions";
 import DepartmentRemarks from "./pages/DepartmentRemarks";
 import AuditLogs from "./pages/AuditLogs";
 import DepartmentSettings from "./pages/DepartmentSettings";
+import NotFound from "./pages/NotFound";
 
 
 function App() {
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
+  useEffect(() => {
+    const titles = {
+      '/': 'Maharaja Institute of Technology Mysore | Faculty & Course Feedback Portal',
+      '/admin-login': 'Admin Login | MIT Mysore',
+      '/department-login': 'Department Login | MIT Mysore',
+      '/student-login': 'Student Login | MIT Mysore',
+      '/faculty-login': 'Faculty Login | MIT Mysore',
+      '/admin-dashboard': 'Admin Dashboard | MIT Mysore',
+      '/faculty-dashboard': 'Faculty Dashboard | MIT Mysore',
+      '/faculty-settings': 'Faculty Settings | MIT Mysore',
+      '/faculty-profile': 'Faculty Profile | MIT Mysore',
+      '/feedback': 'Student Feedback Evaluation | MIT Mysore'
+    };
+
+    if (titles[location.pathname]) {
+      document.title = titles[location.pathname];
+    } else if (location.pathname.startsWith('/department-dashboard')) {
+      document.title = 'Department Dashboard | MIT Mysore';
+    } else if (location.pathname.startsWith('/manage-') || location.pathname.startsWith('/add-course') || location.pathname.startsWith('/department-')) {
+      document.title = 'Department Management | MIT Mysore';
+    } else if (location.pathname.startsWith('/admin/')) {
+      document.title = 'Admin Center | MIT Mysore';
+    }
+  }, [location.pathname]);
+
   return (
     <>
       <Toaster 
@@ -101,8 +128,12 @@ function App() {
           <Route path="/faculty-profile" element={<FacultyProfile />} />
         </Route>
 
-        <Route path="/department/:dept_id" element={<DepartmentPage />} />
-        <Route path="/feedback" element={<FeedbackForm />} />
+        {/* Guarded Student Evaluation & Legacy Department Routes */}
+        <Route path="/department/:dept_id" element={<ProtectedRoute allowedRoles={['admin', 'department']}><DepartmentPage /></ProtectedRoute>} />
+        <Route path="/feedback" element={<ProtectedRoute allowedRoles={['student']}><FeedbackForm /></ProtectedRoute>} />
+
+        {/* Global Catch-All 404 Route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

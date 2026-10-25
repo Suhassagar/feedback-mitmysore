@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../services/apiClient';
 import GenerativeChart from './GenerativeChart';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+import { sanitizeUrl } from '../../utils/urlSanitizer';
 import { 
   X, 
   Mic, 
@@ -404,9 +405,9 @@ const CopilotWidget = () => {
         .markdown-content code { background: rgba(0,0,0,0.3) !important; padding: 2px 6px; border-radius: 4px; color: #93c5fd !important; }
         
         @keyframes sagarPulseRing {
-          0% { transform: scale(0.95); opacity: 0.8; }
-          50% { transform: scale(1.22); opacity: 0; }
-          100% { transform: scale(1.22); opacity: 0; }
+          0% { transform: scale(0.98); opacity: 0.4; }
+          60% { transform: scale(1.14); opacity: 0; }
+          100% { transform: scale(1.14); opacity: 0; }
         }
 
         @keyframes sagarGreetingWave {
@@ -546,11 +547,11 @@ const CopilotWidget = () => {
           width: `${ICON_SIZE}px`,
           height: `${ICON_SIZE}px`,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 50%, #4F46E5 100%)',
+          background: 'linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #2563EB 100%)',
           padding: '2.5px',
           boxShadow: isDragging 
-            ? '0 20px 35px -5px rgba(37, 99, 235, 0.55), 0 0 20px rgba(59, 130, 246, 0.6)'
-            : '0 10px 25px -4px rgba(37, 99, 235, 0.45), 0 0 14px rgba(59, 130, 246, 0.35)',
+            ? '0 16px 32px -4px rgba(15, 23, 42, 0.45), 0 4px 12px rgba(0, 0, 0, 0.2)'
+            : '0 8px 20px -2px rgba(15, 23, 42, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15)',
           cursor: isDragging ? 'grabbing' : 'grab',
           zIndex: 9999,
           display: 'flex',
@@ -559,7 +560,7 @@ const CopilotWidget = () => {
           touchAction: 'none',
           userSelect: 'none',
           opacity: 1,
-          transform: isDragging ? 'scale(1.1)' : 'scale(1)',
+          transform: isDragging ? 'scale(1.06)' : 'scale(1)',
           transition: isDragging 
             ? 'opacity 0.2s, box-shadow 0.2s' 
             : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'
@@ -569,10 +570,10 @@ const CopilotWidget = () => {
         {!isOpen && isBubbleVisible && (
           <span style={{
             position: 'absolute',
-            inset: '-5px',
+            inset: '-4px',
             borderRadius: '50%',
-            border: '2px solid rgba(59, 130, 246, 0.65)',
-            animation: 'sagarPulseRing 2s infinite',
+            border: '2px solid rgba(59, 130, 246, 0.35)',
+            animation: 'sagarPulseRing 2.5s infinite',
             pointerEvents: 'none'
           }} />
         )}
@@ -637,12 +638,12 @@ const CopilotWidget = () => {
         style={{
           position: 'fixed',
           ...windowPlacement,
-          background: 'rgba(20, 20, 30, 0.90)',
+          background: '#0F172A',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 25px 50px -10px rgba(0,0,0,0.65), 0 0 1px rgba(255,255,255,0.2) inset',
+          borderRadius: '16px',
+          border: '1px solid #1E293B',
+          boxShadow: '0 20px 40px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)',
           zIndex: 9998,
           display: 'flex',
           flexDirection: 'column',
@@ -821,7 +822,26 @@ const CopilotWidget = () => {
                   lineHeight: '1.5',
                   border: msg.role === 'model' ? '1px solid rgba(255,255,255,0.1)' : 'none'
                 }}>
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <ReactMarkdown
+                    components={{
+                      a: ({ node, href, children, ...props }) => {
+                        const safeHref = sanitizeUrl(href);
+                        return (
+                          <a
+                            href={safeHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#60A5FA', textDecoration: 'underline' }}
+                            {...props}
+                          >
+                            {children}
+                          </a>
+                        );
+                      }
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 </div>
               )}
 

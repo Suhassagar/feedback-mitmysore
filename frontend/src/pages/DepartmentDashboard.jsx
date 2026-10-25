@@ -12,6 +12,7 @@ import { useSessions } from "../hooks/useSessions";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDepartmentName } from "../hooks/useDepartmentName";
 import DepartmentExportModal from "../components/DepartmentExportModal";
+import FacultyAvatar from "../components/ui/FacultyAvatar";
 
 export default function DepartmentDashboard() {
   const { dept_id } = useParams();
@@ -230,10 +231,11 @@ export default function DepartmentDashboard() {
                     }}>
                       #{index + 1}
                     </div>
-                    <img
-                      src={`https://ui-avatars.com/api/?name=${f.name.replace(" ", "+")}&background=random&color=fff&size=48`}
-                      alt={f.name}
-                      style={{ borderRadius: "10px", width: "48px", height: "48px" }}
+                    <FacultyAvatar
+                      name={f.name}
+                      photoUrl={f.profile_picture_url}
+                      size={48}
+                      borderRadius="10px"
                     />
                     <div>
                       <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "600", color: "var(--text-primary)" }}>{f.name}</h4>

@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import apiClient from "../services/apiClient";
+import apiClient, { API_BASE_URL } from "../services/apiClient";
 import { useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { Plus, Activity, Trash2, Mail } from "lucide-react";
+import { Plus, Activity, Trash2, Mail, Download, X } from "lucide-react";
+import { io } from "socket.io-client";
 import PageTransition from "../components/PageTransition";
 import { useSessions } from "../hooks/useSessions";
 import useCopilotStore from "../store/useCopilotStore";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import EmptyState from "../components/ui/EmptyState";
+import SessionExportModal from "../components/SessionExportModal";
 
 export default function ManageSessions() {
   const { dept_id } = useParams();
@@ -25,6 +27,7 @@ export default function ManageSessions() {
   const [trackSessionId, setTrackSessionId] = useState(null);
   const [trackData, setTrackData] = useState([]);
   const [notifying, setNotifying] = useState(null);
+  const [exportSessionId, setExportSessionId] = useState(null);
 
   // Copilot Integration
   const { uiIntent, setUiIntent } = useCopilotStore();
@@ -39,6 +42,23 @@ export default function ManageSessions() {
       setUiIntent(null); // Clear intent after consuming
     }
   }, [uiIntent, sessionId, setUiIntent]);
+
+  // Real-Time WebSocket Listener for Student Feedback Submissions
+  useEffect(() => {
+    if (!dept_id) return;
+    const socket = io(API_BASE_URL, { withCredentials: true });
+    socket.emit("register_dashboard", { dept_id });
+
+    socket.on("NEW_FEEDBACK_RECEIVED", (data) => {
+      if (!data?.dept_id || data.dept_id.toUpperCase() === String(dept_id).toUpperCase()) {
+        loadSessions();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [dept_id, loadSessions]);
 
   // Handlers
   const generateSessionId = () => {
@@ -359,38 +379,92 @@ export default function ManageSessions() {
                         <th style={{ padding: "16px", color: "var(--text-secondary)", fontWeight: "600", whiteSpace: "nowrap" }}>Session ID</th>
                         <th style={{ padding: "16px", color: "var(--text-secondary)", fontWeight: "600", whiteSpace: "nowrap" }}>Sem/Sec</th>
                         <th style={{ padding: "16px", color: "var(--text-secondary)", fontWeight: "600", whiteSpace: "nowrap" }}>Status</th>
+                        <th style={{ padding: "16px", color: "var(--text-secondary)", fontWeight: "600", whiteSpace: "nowrap" }}>Student Turnout</th>
                         <th style={{ padding: "16px", color: "var(--text-secondary)", fontWeight: "600", textAlign: "right", whiteSpace: "nowrap" }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sessions.map((s) => (
-                        <tr key={s.session_id} style={{ borderBottom: "1px solid var(--border-color)", transition: "background 0.2s" }} className="hoverable">
-                          <td style={{ padding: "16px", fontWeight: "600", color: "var(--text-primary)", whiteSpace: "nowrap" }}>{s.session_id}</td>
-                          <td style={{ padding: "16px", whiteSpace: "nowrap" }}>Sem {s.sem} | Sec {s.section}</td>
-                          <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
-                            <span style={{ 
-                              background: s.status === 'active' ? '#DCFCE7' : '#F3F4F6', 
-                              color: s.status === 'active' ? '#166534' : '#374151',
-                              padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600"
-                            }}>
-                              {s.status.toUpperCase()}
-                            </span>
-                          </td>
-                          <td style={{ padding: "16px", textAlign: "right" }}>
-                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                              <button className="btn hoverable" style={{ height: "36px", padding: "0 16px", fontSize: "13px", borderRadius: "8px", border: "1px solid var(--border-color)", background: "transparent", color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => handleNotifyStudents(s.session_id)} disabled={notifying === s.session_id}>
-                                <Mail size={14} /> {notifying === s.session_id ? 'Sending...' : 'Email'}
-                              </button>
-                              <button className="btn btn-track hoverable" style={{ height: "36px", padding: "0 16px", fontSize: "13px", borderRadius: "8px" }} onClick={() => handleTrackSession(s.session_id)}>
-                                <Activity size={14} /> Track
-                              </button>
-                              <button className="btn btn-delete hoverable" style={{ height: "36px", padding: "0 16px", fontSize: "13px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => setSessionToDelete(s.session_id)} aria-label="Delete Session">
-                                <Trash2 size={14} /> Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {sessions.map((s) => {
+                        const pct = parseFloat(s.turnout_pct || 0);
+                        const turnoutColor = pct >= 75 ? "#166534" : pct >= 40 ? "#1E40AF" : "#92400E";
+                        const turnoutBg = pct >= 75 ? "#DCFCE7" : pct >= 40 ? "#DBEAFE" : "#FEF3C7";
+                        const barColor = pct >= 75 ? "#16A34A" : pct >= 40 ? "#2563EB" : "#D97706";
+
+                        return (
+                          <tr key={s.session_id} style={{ borderBottom: "1px solid var(--border-color)", transition: "background 0.2s" }} className="hoverable">
+                            <td style={{ padding: "16px", fontWeight: "600", color: "var(--text-primary)", whiteSpace: "nowrap" }}>{s.session_id}</td>
+                            <td style={{ padding: "16px", whiteSpace: "nowrap" }}>Sem {s.sem} | Sec {s.section}</td>
+                            <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
+                              <span style={{ 
+                                background: s.status === 'active' ? '#DCFCE7' : '#F3F4F6', 
+                                color: s.status === 'active' ? '#166534' : '#374151',
+                                padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600"
+                              }}>
+                                {s.status.toUpperCase()}
+                              </span>
+                            </td>
+                            <td style={{ padding: "16px", minWidth: "170px" }}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "600" }}>
+                                  <span style={{ color: "var(--text-primary)" }}>{s.completed_students || 0}/{s.total_students || 0}</span>
+                                  <span style={{
+                                    color: turnoutColor,
+                                    background: turnoutBg,
+                                    padding: "2px 7px",
+                                    borderRadius: "8px",
+                                    fontSize: "11px",
+                                    fontWeight: "700"
+                                  }}>
+                                    {pct}%
+                                  </span>
+                                </div>
+                                <div style={{ height: "6px", width: "100%", background: "#E2E8F0", borderRadius: "99px", overflow: "hidden" }}>
+                                  <div style={{
+                                    height: "100%",
+                                    width: `${Math.min(pct, 100)}%`,
+                                    background: barColor,
+                                    borderRadius: "99px",
+                                    transition: "width 0.4s ease"
+                                  }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: "16px", textAlign: "right" }}>
+                              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                                <button
+                                  className="btn hoverable"
+                                  style={{
+                                    height: "36px",
+                                    padding: "0 12px",
+                                    fontSize: "13px",
+                                    borderRadius: "8px",
+                                    border: "1px solid var(--border-color)",
+                                    background: "#ffffff",
+                                    color: "#2563EB",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "5px",
+                                    fontWeight: "600"
+                                  }}
+                                  onClick={() => setExportSessionId(s.session_id)}
+                                  title="Export Session Feedback Report"
+                                >
+                                  <Download size={14} /> Report
+                                </button>
+                                <button className="btn hoverable" style={{ height: "36px", padding: "0 14px", fontSize: "13px", borderRadius: "8px", border: "1px solid var(--border-color)", background: "transparent", color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => handleNotifyStudents(s.session_id)} disabled={notifying === s.session_id}>
+                                  <Mail size={14} /> {notifying === s.session_id ? 'Sending...' : 'Email'}
+                                </button>
+                                <button className="btn btn-track hoverable" style={{ height: "36px", padding: "0 14px", fontSize: "13px", borderRadius: "8px" }} onClick={() => handleTrackSession(s.session_id)}>
+                                  <Activity size={14} /> Track
+                                </button>
+                                <button className="btn btn-delete hoverable" style={{ height: "36px", padding: "0 14px", fontSize: "13px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px" }} onClick={() => setSessionToDelete(s.session_id)} aria-label="Delete Session">
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -399,112 +473,198 @@ export default function ManageSessions() {
 
             {/* 2. MOBILE CARD VIEW (Visible on < 768px - Touch-optimized Native Card Layout) */}
             <div className="session-mobile-view">
-              {sessions.map((s) => (
-                <div key={s.session_id} className="session-card-mobile hoverable">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontWeight: "700", fontSize: "15px", color: "var(--text-primary)", letterSpacing: "0.5px", fontFamily: "monospace" }}>
-                        {s.session_id}
-                      </span>
+              {sessions.map((s) => {
+                const pct = parseFloat(s.turnout_pct || 0);
+                const turnoutColor = pct >= 75 ? "#166534" : pct >= 40 ? "#1E40AF" : "#92400E";
+                const turnoutBg = pct >= 75 ? "#DCFCE7" : pct >= 40 ? "#DBEAFE" : "#FEF3C7";
+                const barColor = pct >= 75 ? "#16A34A" : pct >= 40 ? "#2563EB" : "#D97706";
+
+                return (
+                  <div key={s.session_id} className="session-card-mobile hoverable">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontWeight: "700", fontSize: "15px", color: "var(--text-primary)", letterSpacing: "0.5px", fontFamily: "monospace" }}>
+                          {s.session_id}
+                        </span>
+                        <span style={{ 
+                          fontSize: "12px", 
+                          color: "var(--text-secondary)", 
+                          background: "var(--bg-light)", 
+                          padding: "3px 8px", 
+                          borderRadius: "6px",
+                          fontWeight: "600",
+                          border: "1px solid var(--border-color)"
+                        }}>
+                          Sem {s.sem} • Sec {s.section}
+                        </span>
+                      </div>
                       <span style={{ 
-                        fontSize: "12px", 
-                        color: "var(--text-secondary)", 
-                        background: "var(--bg-light)", 
-                        padding: "3px 8px", 
-                        borderRadius: "6px",
-                        fontWeight: "600",
-                        border: "1px solid var(--border-color)"
+                        background: s.status === 'active' ? '#DCFCE7' : '#F3F4F6', 
+                        color: s.status === 'active' ? '#166534' : '#374151',
+                        padding: "4px 10px", 
+                        borderRadius: "12px", 
+                        fontSize: "11px", 
+                        fontWeight: "700",
+                        textTransform: "uppercase"
                       }}>
-                        Sem {s.sem} • Sec {s.section}
+                        {s.status}
                       </span>
                     </div>
-                    <span style={{ 
-                      background: s.status === 'active' ? '#DCFCE7' : '#F3F4F6', 
-                      color: s.status === 'active' ? '#166534' : '#374151',
-                      padding: "4px 10px", 
-                      borderRadius: "12px", 
-                      fontSize: "11px", 
-                      fontWeight: "700",
-                      textTransform: "uppercase"
-                    }}>
-                      {s.status}
-                    </span>
-                  </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", paddingTop: "8px", borderTop: "1px solid var(--border-color)" }}>
-                    <button 
-                      className="btn hoverable" 
-                      style={{ 
-                        height: "36px", 
-                        padding: "0 6px", 
-                        fontSize: "12px", 
-                        borderRadius: "8px", 
-                        border: "1px solid var(--border-color)", 
-                        background: "transparent", 
-                        color: "var(--primary)", 
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: "center", 
-                        gap: "4px",
-                        fontWeight: "600"
-                      }} 
-                      onClick={() => handleNotifyStudents(s.session_id)} 
-                      disabled={notifying === s.session_id}
-                    >
-                      <Mail size={13} /> {notifying === s.session_id ? '...' : 'Email'}
-                    </button>
-                    <button 
-                      className="btn btn-track hoverable" 
-                      style={{ 
-                        height: "36px", 
-                        padding: "0 6px", 
-                        fontSize: "12px", 
-                        borderRadius: "8px",
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: "center", 
-                        gap: "4px",
-                        fontWeight: "600"
-                      }} 
-                      onClick={() => handleTrackSession(s.session_id)}
-                    >
-                      <Activity size={13} /> Track
-                    </button>
-                    <button 
-                      className="btn btn-delete hoverable" 
-                      style={{ 
-                        height: "36px", 
-                        padding: "0 6px", 
-                        fontSize: "12px", 
-                        borderRadius: "8px", 
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: "center", 
-                        gap: "4px",
-                        fontWeight: "600"
-                      }} 
-                      onClick={() => setSessionToDelete(s.session_id)}
-                      aria-label="Delete Session"
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
+                    {/* Turnout Progress Bar in Mobile */}
+                    <div style={{ marginTop: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "600", marginBottom: "4px" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Turnout: {s.completed_students || 0}/{s.total_students || 0}</span>
+                        <span style={{
+                          color: turnoutColor,
+                          background: turnoutBg,
+                          padding: "1px 6px",
+                          borderRadius: "6px",
+                          fontSize: "11px"
+                        }}>
+                          {pct}%
+                        </span>
+                      </div>
+                      <div style={{ height: "6px", width: "100%", background: "#E2E8F0", borderRadius: "99px", overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%",
+                          width: `${Math.min(pct, 100)}%`,
+                          background: barColor,
+                          borderRadius: "99px",
+                          transition: "width 0.4s ease"
+                        }} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "6px", paddingTop: "8px", borderTop: "1px solid var(--border-color)" }}>
+                      <button 
+                        className="btn hoverable" 
+                        style={{ 
+                          height: "36px", 
+                          padding: "0 4px", 
+                          fontSize: "11.5px", 
+                          borderRadius: "8px", 
+                          border: "1px solid #CBD5E1", 
+                          background: "#ffffff", 
+                          color: "#2563EB", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center", 
+                          gap: "3px",
+                          fontWeight: "600"
+                        }} 
+                        onClick={() => setExportSessionId(s.session_id)}
+                        title="Export Report"
+                      >
+                        <Download size={13} /> Report
+                      </button>
+                      <button 
+                        className="btn hoverable" 
+                        style={{ 
+                          height: "36px", 
+                          padding: "0 4px", 
+                          fontSize: "11.5px", 
+                          borderRadius: "8px", 
+                          border: "1px solid var(--border-color)", 
+                          background: "transparent", 
+                          color: "var(--primary)", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center", 
+                          gap: "3px",
+                          fontWeight: "600"
+                        }} 
+                        onClick={() => handleNotifyStudents(s.session_id)} 
+                        disabled={notifying === s.session_id}
+                      >
+                        <Mail size={13} /> {notifying === s.session_id ? '...' : 'Email'}
+                      </button>
+                      <button 
+                        className="btn btn-track hoverable" 
+                        style={{ 
+                          height: "36px", 
+                          padding: "0 4px", 
+                          fontSize: "11.5px", 
+                          borderRadius: "8px", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center", 
+                          gap: "3px",
+                          fontWeight: "600"
+                        }} 
+                        onClick={() => handleTrackSession(s.session_id)}
+                      >
+                        <Activity size={13} /> Track
+                      </button>
+                      <button 
+                        className="btn btn-delete hoverable" 
+                        style={{ 
+                          height: "36px", 
+                          padding: "0 4px", 
+                          fontSize: "11.5px", 
+                          borderRadius: "8px", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center", 
+                          gap: "3px",
+                          fontWeight: "600"
+                        }} 
+                        onClick={() => setSessionToDelete(s.session_id)}
+                        aria-label="Delete Session"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
 
         {/* TRACK SESSION MODAL */}
         {trackSessionId && (
-          <div className="glass-modal-overlay">
-            <div className="card glass-modal flex-col gap-md" style={{ width: "100%", maxWidth: "800px", maxHeight: "85vh", borderRadius: "20px", display: "flex", flexDirection: "column", margin: "16px" }}>
+          <div className="glass-modal-overlay" onClick={() => setTrackSessionId(null)}>
+            <div 
+              className="card glass-modal flex-col gap-md" 
+              style={{ width: "100%", maxWidth: "800px", maxHeight: "85vh", borderRadius: "20px", display: "flex", flexDirection: "column", margin: "16px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: "16px" }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "600" }}>Live Tracking</h3>
                   <p style={{ margin: "4px 0 0 0", color: "var(--text-secondary)", fontSize: "14px" }}>Session: {trackSessionId}</p>
                 </div>
-                <button className="btn" onClick={() => setTrackSessionId(null)}>Close</button>
+                <button 
+                  onClick={() => setTrackSessionId(null)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    border: "1px solid var(--border-color, #E2E8F0)",
+                    background: "var(--card-bg, #ffffff)",
+                    color: "var(--text-secondary, #64748B)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F1F5F9";
+                    e.currentTarget.style.color = "#0F172A";
+                    e.currentTarget.style.borderColor = "#CBD5E1";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "var(--card-bg, #ffffff)";
+                    e.currentTarget.style.color = "var(--text-secondary, #64748B)";
+                    e.currentTarget.style.borderColor = "var(--border-color, #E2E8F0)";
+                  }}
+                  aria-label="Close"
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
               </div>
               
               <div style={{ overflowY: "auto", flexGrow: 1, paddingRight: "8px" }}>
@@ -567,6 +727,13 @@ export default function ManageSessions() {
           confirmText="Yes, Delete Session"
           isDestructive={true}
           isLoading={isDeleting}
+        />
+
+        {/* SESSION CONSOLIDATED EXPORT MODAL */}
+        <SessionExportModal
+          isOpen={!!exportSessionId}
+          onClose={() => setExportSessionId(null)}
+          sessionId={exportSessionId}
         />
 
       </div>

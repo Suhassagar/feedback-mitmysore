@@ -57,6 +57,7 @@ async function generateLQIP(buffer) {
  * 4. Stream to Cloudinary (with fallback to local storage).
  */
 async function processAndUploadLogo(buffer, deptId, oldLogoUrl = null) {
+  const safeDeptId = String(deptId || 'dept').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'dept';
   const fileType = validateMagicBytes(buffer);
   if (!fileType) {
     throw new Error('Invalid image file format. Supported: PNG, JPEG, WEBP, GIF.');
@@ -80,7 +81,7 @@ async function processAndUploadLogo(buffer, deptId, oldLogoUrl = null) {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             folder: 'department_logos',
-            public_id: `dept_${deptId.toLowerCase()}_${Date.now()}`,
+            public_id: `dept_${safeDeptId}_${Date.now()}`,
             format: 'webp',
             transformation: [
               { width: 240, height: 240, crop: 'fill', gravity: 'center' },
@@ -115,7 +116,7 @@ async function processAndUploadLogo(buffer, deptId, oldLogoUrl = null) {
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    const filename = `dept_${deptId.toLowerCase()}_${Date.now()}.webp`;
+    const filename = `dept_${safeDeptId}_${Date.now()}.webp`;
     const localFilePath = path.join(uploadDir, filename);
     await fs.promises.writeFile(localFilePath, optimizedBuffer);
     logoUrl = `/uploads/logos/${filename}`;

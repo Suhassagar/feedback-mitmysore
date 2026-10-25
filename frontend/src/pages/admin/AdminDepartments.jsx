@@ -344,7 +344,7 @@ export default function AdminDepartments() {
         </div>
 
         {/* Filter Pills */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           <button
             onClick={() => setStatusFilter("all")}
             style={{

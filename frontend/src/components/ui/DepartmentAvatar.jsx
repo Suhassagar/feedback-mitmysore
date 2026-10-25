@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useDepartmentProfile } from '../../hooks/useDepartmentName';
+import { safeImageUrl } from '../../utils/urlSanitizer';
 
 // Curated enterprise mesh gradients for deterministic fallback avatars
 const FALLBACK_GRADIENTS = [
@@ -43,13 +44,14 @@ export default function DepartmentAvatar({
 
   // Format backend upload relative path if needed
   const resolvedLogoUrl = useMemo(() => {
-    if (!rawLogoUrl) return null;
-    if (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://') || rawLogoUrl.startsWith('data:')) {
-      return rawLogoUrl;
+    const safeUrl = safeImageUrl(rawLogoUrl, null);
+    if (!safeUrl) return null;
+    if (safeUrl.startsWith('http://') || safeUrl.startsWith('https://') || safeUrl.startsWith('data:image/')) {
+      return safeUrl;
     }
     // Local static uploads served from backend
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8081';
-    return `${apiBase.replace(/\/api$/, '')}${rawLogoUrl.startsWith('/') ? '' : '/'}${rawLogoUrl}`;
+    return `${apiBase.replace(/\/api$/, '')}${safeUrl.startsWith('/') ? '' : '/'}${safeUrl}`;
   }, [rawLogoUrl]);
 
   // Deterministic fallback gradient

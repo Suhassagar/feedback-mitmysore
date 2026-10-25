@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import apiClient from '../services/apiClient';
+import { Headphones } from 'lucide-react';
 import './HomePortal.css';
 
 export default function HomePortal() {
@@ -180,9 +181,9 @@ export default function HomePortal() {
           Designed and Developed by Suhas J. Sagar | Department of CSE
         </div>
 
-        <div className="home-footer" style={{ marginTop: "16px" }}>
-          <span>🎧</span>
-          <span>Need help? <a href="#">Contact System Administrator</a></span>
+        <div className="home-footer" style={{ marginTop: "16px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <Headphones size={15} style={{ color: "var(--text-secondary)" }} />
+          <span>Need help? <a href="mailto:admin@mitmysore.in" style={{ color: "var(--primary)", textDecoration: "none" }}>Contact System Administrator</a></span>
           <span style={{ margin: "0 10px", color: "var(--border-color)" }}>|</span>
           <span onClick={() => setShowRegPopup(true)} style={{ color: "var(--primary)", cursor: "pointer", fontWeight: 500 }}>
             New Faculty Registration

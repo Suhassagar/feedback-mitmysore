@@ -345,9 +345,17 @@ export default function ManageQuestions() {
 
       {/* MODAL: ADD HEADING */}
       {showAddHeadingModal && (
-        <div className="modal-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, animation: "fadeIn 0.2s" }}>
-          <div className="card" style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "16px", overflow: "hidden", animation: "slideUp 0.3s ease-out", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}>
-            <div style={{ padding: "16px 20px", background: "linear-gradient(to right, #f8fafc, #fff)", borderBottom: "1px solid #e2e8f0" }}>
+        <div 
+          className="modal-overlay" 
+          onClick={() => setShowAddHeadingModal(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}
+        >
+          <div 
+            className="card" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "16px", overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+          >
+            <div style={{ padding: "16px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
               <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>Create New Heading</h3>
             </div>
             <form onSubmit={handleCreateHeading} style={{ padding: "20px" }}>
@@ -374,9 +382,17 @@ export default function ManageQuestions() {
 
       {/* MODAL: ADD QUESTION */}
       {showAddQuestionModal && (
-        <div className="modal-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, animation: "fadeIn 0.2s" }}>
-          <div className="card" style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "16px", overflow: "hidden", animation: "slideUp 0.3s ease-out", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}>
-            <div style={{ padding: "16px 20px", background: "linear-gradient(to right, #f8fafc, #fff)", borderBottom: "1px solid #e2e8f0" }}>
+        <div 
+          className="modal-overlay" 
+          onClick={() => setShowAddQuestionModal(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}
+        >
+          <div 
+            className="card" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "16px", overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+          >
+            <div style={{ padding: "16px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
               <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>Add Question to "{targetHeading}"</h3>
             </div>
             <form onSubmit={handleAddQuestion} style={{ padding: "20px" }}>
@@ -403,9 +419,17 @@ export default function ManageQuestions() {
 
       {/* MODAL: EDIT QUESTION */}
       {showEditModal && (
-        <div className="modal-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, animation: "fadeIn 0.2s" }}>
-          <div className="card" style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "16px", overflow: "hidden", animation: "slideUp 0.3s ease-out", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}>
-            <div style={{ padding: "16px 20px", background: "linear-gradient(to right, #f8fafc, #fff)", borderBottom: "1px solid #e2e8f0" }}>
+        <div 
+          className="modal-overlay" 
+          onClick={() => setShowEditModal(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}
+        >
+          <div 
+            className="card" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "16px", overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
+          >
+            <div style={{ padding: "16px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <div style={{ background: "var(--focus-ring)", padding: "8px", borderRadius: "8px" }}>
                   <Edit size={16} color="var(--primary)" />

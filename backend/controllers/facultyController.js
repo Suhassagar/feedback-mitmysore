@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
 const { logActivity } = require('../utils/logger');
+const { validateMagicBytes } = require('../utils/imageProcessor');
 const cloudinary = require('cloudinary').v2;
 
 cloudinary.config({
@@ -26,7 +27,8 @@ const addFaculty = async (req, res) => {
       dept_id,
       name,
       email,
-      password: defaultPassword
+      password: defaultPassword,
+      must_change_password: true
     });
 
     // Sync with global_directory
@@ -54,20 +56,26 @@ const registerFaculty = async (req, res) => {
   if (dept_id) dept_id = dept_id.toUpperCase();
 
   try {
-    const deptResult = await db('department').where({ dept_id });
-    if (deptResult.length === 0)
-      return res.json({ success: false, message: "Department ID does not exist" });
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanFid = String(faculty_id).trim().toUpperCase();
 
-    const fidResult = await db('global_faculty').where({ faculty_id });
-    if (fidResult.length > 0)
-      return res.json({ success: false, message: "Faculty ID already exists" });
+    const existingFaculty = await db('global_faculty')
+      .whereRaw('UPPER(faculty_id) = ? OR LOWER(email) = ?', [cleanFid, cleanEmail])
+      .first();
 
-    const emailResult = await db('global_faculty').where({ email });
-    if (emailResult.length > 0)
-      return res.json({ success: false, message: "Email already registered" });
+    const existingPending = await db('global_pending_faculty_registrations')
+      .whereRaw('UPPER(faculty_id) = ? OR LOWER(email) = ?', [cleanFid, cleanEmail])
+      .first();
+
+    if (existingFaculty || existingPending) {
+      return res.status(409).json({ 
+        success: false, 
+        message: "Registration could not be completed with the provided credentials. If you already have an account, please log in or contact your department HOD." 
+      });
+    }
 
     await db('global_pending_faculty_registrations').insert({
-      faculty_id, name, email, dept_id
+      faculty_id: cleanFid, name: name.trim(), email: cleanEmail, dept_id
     });
 
     res.json({ success: true, message: "Registration submitted! Waiting for department approval." });
@@ -122,7 +130,7 @@ const approveFaculty = async (req, res) => {
     const defaultPassword = await bcrypt.hash("Fac@2007", 10);
 
     await trx('global_faculty').insert({
-      faculty_id, dept_id, name, email, password: defaultPassword
+      faculty_id, dept_id, name, email, password: defaultPassword, must_change_password: true
     });
 
     await trx('global_directory')
@@ -235,6 +243,15 @@ const bulkUploadFaculty = async (req, res) => {
     return res.status(400).json({ error: "Invalid payload" });
   }
 
+  const cleanDeptId = String(dept_id).trim().toUpperCase();
+  if (req.session?.role === 'department' && req.session.dept_id && req.session.dept_id.toUpperCase() !== cleanDeptId) {
+    return res.status(403).json({ error: "Unauthorized: Cannot bulk upload faculty for another department." });
+  }
+
+  if (faculty.length > 1000) {
+    return res.status(400).json({ error: "Batch size exceeds maximum limit of 1000 records per upload." });
+  }
+
   const trx = await db.transaction();
   try {
     let insertedCount = 0;
@@ -252,7 +269,8 @@ const bulkUploadFaculty = async (req, res) => {
           dept_id,
           name: f.name,
           email,
-          password: defaultPassword
+          password: defaultPassword,
+          must_change_password: true
         });
         insertedCount++;
       }
@@ -286,6 +304,12 @@ const updateOwnProfile = async (req, res) => {
   
   if (!faculty_id) return res.status(401).json({ success: false, message: "Unauthorized" });
 
+  if (password !== undefined && password !== null && password.trim() !== '') {
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters long." });
+    }
+  }
+
   const trx = await db.transaction();
   try {
     const currentFaculty = await trx('global_faculty').where({ faculty_id, dept_id }).first();
@@ -312,7 +336,15 @@ const updateOwnProfile = async (req, res) => {
     }
     
     if (password && password.trim() !== '') {
+      if (password.length < 6) {
+        await trx.rollback();
+        return res.status(400).json({ success: false, message: "Password must be at least 6 characters long." });
+      }
       updateData.password = await bcrypt.hash(password, 10);
+      updateData.must_change_password = false;
+      if (req.session) {
+        req.session.must_change_password = false;
+      }
     }
     
     if (Object.keys(updateData).length > 0) {
@@ -337,13 +369,27 @@ const updateOwnProfile = async (req, res) => {
 //=========================================================
 const uploadTempProfilePicture = async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.file || !req.file.buffer) {
       return res.status(400).json({ success: false, message: "No image provided" });
     }
 
+    // Validate genuine image magic bytes (PNG, JPEG, WEBP, GIF)
+    const fileType = validateMagicBytes(req.file.buffer);
+    if (!fileType) {
+      return res.status(400).json({ success: false, message: "Invalid or disguised image file format. Supported formats: PNG, JPEG, WEBP, GIF." });
+    }
+
+    // Scope temporary upload to the authenticated faculty member to prevent asset confusion / IDOR
+    const facultyId = req.session?.faculty_id ? String(req.session.faculty_id).replace(/[^a-zA-Z0-9_-]/g, '') : 'fac';
+    const tempPublicId = `temp_${facultyId}_${Date.now()}`;
+
     const uploadResult = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: 'faculty_profiles', tags: ['temp_upload'] },
+        { 
+          folder: 'faculty_profiles', 
+          public_id: tempPublicId,
+          tags: ['temp_upload', `faculty_${facultyId}`] 
+        },
         (error, result) => {
           if (error) reject(error);
           else resolve(result);
@@ -384,13 +430,18 @@ const saveProfilePicture = async (req, res) => {
     const { faculty_id, dept_id } = req.session;
     const { finalUrl } = req.body;
 
-    if (!finalUrl) {
+    if (!finalUrl || typeof finalUrl !== 'string') {
       return res.status(400).json({ success: false, message: "No URL provided" });
     }
 
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    if (!finalUrl.startsWith(`https://res.cloudinary.com/${cloudName}/`)) {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+    if (!cloudName || !finalUrl.startsWith(`https://res.cloudinary.com/${cloudName}/`)) {
       return res.status(403).json({ success: false, message: "Invalid image source. Untrusted URL detected." });
+    }
+
+    // Ensure the image belongs strictly to the faculty_profiles namespace
+    if (!finalUrl.includes('/faculty_profiles/')) {
+      return res.status(403).json({ success: false, message: "Invalid image namespace." });
     }
 
     // Fetch old URL before updating
@@ -430,13 +481,23 @@ const saveProfilePicture = async (req, res) => {
 const deleteTempProfilePicture = async (req, res) => {
   try {
     const { public_id } = req.body;
-    if (public_id) {
-      await cloudinary.uploader.destroy(public_id);
+    const facultyId = req.session?.faculty_id ? String(req.session.faculty_id).replace(/[^a-zA-Z0-9_-]/g, '') : null;
+
+    if (!public_id || typeof public_id !== 'string') {
+      return res.status(400).json({ success: false, message: "Missing or invalid public_id" });
     }
+
+    // Strict IDOR prevention: only allow deleting temp images that belong to the active faculty session
+    const expectedPrefix = `faculty_profiles/temp_${facultyId}_`;
+    if (!facultyId || !public_id.startsWith(expectedPrefix)) {
+      return res.status(403).json({ success: false, message: "Unauthorized: You cannot delete assets outside your session." });
+    }
+
+    await cloudinary.uploader.destroy(public_id);
     res.json({ success: true });
   } catch (err) {
     console.error("Error deleting temp picture:", err);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: "Failed to delete temporary image" });
   }
 };
 

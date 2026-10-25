@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
+const { escapeSqlLike } = require('../utils/sanitizer');
 
 //=========================================================
 // Get all students by department
@@ -16,8 +17,9 @@ const getStudents = async (req, res) => {
     let baseQuery = db('global_students').whereRaw('UPPER(dept_id) = ?', [cleanDept]);
     if (sem) baseQuery = baseQuery.where({ sem });
     if (search) {
+      const safeSearch = escapeSqlLike(search);
       baseQuery = baseQuery.where(function() {
-        this.where('usn', 'like', `%${search}%`).orWhere('name', 'like', `%${search}%`);
+        this.where('usn', 'like', `%${safeSearch}%`).orWhere('name', 'like', `%${safeSearch}%`);
       });
     }
 

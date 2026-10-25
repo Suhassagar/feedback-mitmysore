@@ -64,6 +64,15 @@ const bulkUploadCourses = async (req, res) => {
     return res.status(400).json({ error: "Invalid payload" });
   }
 
+  const cleanDeptId = String(dept_id).trim().toUpperCase();
+  if (req.session?.role === 'department' && req.session.dept_id && req.session.dept_id.toUpperCase() !== cleanDeptId) {
+    return res.status(403).json({ error: "Unauthorized: Cannot bulk upload courses for another department." });
+  }
+
+  if (courses.length > 1000) {
+    return res.status(400).json({ error: "Batch size exceeds maximum limit of 1000 records per upload." });
+  }
+
   const trx = await db.transaction();
   try {
     let insertedCount = 0;
