@@ -9,5 +9,6 @@ router.put('/end-session/:id', isAdminOrDepartment, sessionController.endSession
 router.delete('/delete-session/:id', isAdminOrDepartment, sessionController.deleteSession);
 router.get('/track-session/:session_id', isAdminOrDepartment, sessionController.trackSession);
 router.post('/sessions/:session_id/notify', isAdminOrDepartment, sessionController.notifyStudents);
+router.get('/sessions/:session_id/report-data', isAdminOrDepartment, sessionController.getSessionReportData);
 
 module.exports = router;

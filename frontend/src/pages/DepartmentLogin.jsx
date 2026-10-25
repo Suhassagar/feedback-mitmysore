@@ -119,14 +119,7 @@ export default function DepartmentLogin() {
                 </div>
               </div>
 
-              <div className="login-options">
-                <label>
-                  <input type="checkbox" /> Remember me
-                </label>
-                <a href="#">Forgot Password?</a>
-              </div>
-
-              {error && <p style={{ color: "var(--danger)", marginBottom: "16px", fontWeight: "500", fontSize: "14px" }}>{error}</p>}
+              {error && <p style={{ color: "var(--danger)", margin: "12px 0", fontWeight: "500", fontSize: "14px" }}>{error}</p>}
 
               <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>
                 Sign In

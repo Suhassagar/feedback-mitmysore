@@ -15,7 +15,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Search State
@@ -33,7 +33,7 @@ export default function AdminLayout() {
         <div className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
         
         {/* ================= SIDEBAR ================= */}
-        <aside className={`dashboard-sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`} style={{ background: "#062E1B", borderRight: "1px solid rgba(16, 185, 129, 0.15)" }}>
+        <aside className={`dashboard-sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`} style={{ background: "var(--navy, #0F172A)", borderRight: "1px solid rgba(255, 255, 255, 0.1)" }}>
           <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", gap: "14px", paddingBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "24px" }}>
             <div style={{ 
               width: '44px', height: '44px', borderRadius: '50%', 
@@ -81,7 +81,6 @@ export default function AdminLayout() {
           </nav>
 
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "16px" }}>
-             {/* Admin drill-down exit button if they are coming from a department */}
             <button className="sidebar-nav-item" onClick={handleLogout} style={{ color: "#FCA5A5" }}>
               <LogOut size={20} /><span>Logout</span>
             </button>
@@ -94,29 +93,41 @@ export default function AdminLayout() {
             <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
               <Menu size={24} />
             </button>
-            <div className="header-search">
+            <form 
+              className="header-search" 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (globalSearch.trim()) {
+                  navigate(`/admin/faculty?search=${encodeURIComponent(globalSearch.trim())}`);
+                }
+              }}
+            >
               <Search size={18} color="var(--text-muted)" />
               <input 
                 type="text" 
-                placeholder="Search..." 
+                placeholder="Search across departments..." 
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
                 style={{ background: "#F3F4F6", border: "none", width: "100%", maxWidth: "350px", padding: "10px 15px", borderRadius: "20px" }}
               />
-            </div>
+            </form>
           </div>
 
           <div className="header-actions">
-            <button className="header-icon-btn" style={{ background: "transparent", border: "none", cursor: "pointer", position: "relative" }}>
+            <button 
+              className="header-icon-btn" 
+              onClick={() => navigate("/admin/system-logs")} 
+              title="System Activity Logs" 
+              style={{ background: "transparent", border: "none", cursor: "pointer", position: "relative", padding: "8px" }}
+            >
               <Bell size={20} color="var(--navy)" />
-              <span style={{ position: "absolute", top: "-2px", right: "-2px", background: "var(--color-danger)", color: "#fff", fontSize: "10px", width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>8</span>
             </button>
             
             <div className="header-profile" style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "5px 10px", borderRadius: "8px", transition: "background 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#F3F4F6"} onMouseOut={(e) => e.currentTarget.style.background = "transparent"}>
-              <img src={`https://ui-avatars.com/api/?name=Admin&background=2563EB&color=fff`} alt="Profile" style={{ width: "36px", height: "36px", borderRadius: "50%" }} />
+              <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'Admin')}&background=16A34A&color=fff`} alt="Profile" style={{ width: "36px", height: "36px", borderRadius: "50%" }} />
               <div className="header-profile-info" style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: "14px", fontWeight: "600", color: "var(--navy)" }}>Dr. Principal</span>
-                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Principal</span>
+                <span style={{ fontSize: "14px", fontWeight: "600", color: "var(--navy)" }}>{user?.username || "Administrator"}</span>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Central Admin</span>
               </div>
               <ChevronDown size={16} color="var(--text-muted)" />
             </div>

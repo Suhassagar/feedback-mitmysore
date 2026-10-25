@@ -479,3 +479,358 @@ export const generateFacultyAppraisalPdf = async ({
   const filename = `MITM_Faculty_Appraisal_${safeName}.pdf`;
   doc.save(filename);
 };
+
+/**
+ * OPTION 3: CONSOLIDATED SESSION FACULTY FEEDBACK REPORT
+ * Scoped strictly to session_id:
+ * - Session Demographics & Student Participation Turnout (%)
+ * - Consolidated Faculty-by-Faculty Performance Table
+ * - Question Parameter Analysis
+ * - Formal Accreditation & Institutional Signatures
+ */
+export const generateSessionConsolidatedPdf = async ({
+  session = {},
+  turnout = {},
+  sessionOverallRating = "0.00",
+  faculties = [],
+  questionBreakdown = [],
+  comparativeMatrix = [],
+  academicYear = "2025–2026"
+}) => {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const startY = await addCollegeHeader(
+    doc,
+    "DETAILED SESSION FEEDBACK EVALUATION REPORT",
+    `Academic Audit & Faculty Evaluation • Session #${session.session_id || "N/A"}`
+  );
+
+  // 1. Session Metadata & Turnout Header Strip (Compact, single-table)
+  autoTable(doc, {
+    startY: startY,
+    head: [[
+      "Session ID",
+      "Department / Program",
+      "Target Cohort",
+      "Academic Cycle",
+      "Student Turnout Rate",
+      "Session Mean Quality"
+    ]],
+    body: [[
+      `#${session.session_id}`,
+      `Dept. of ${session.dept_name || session.dept_id}`,
+      `Semester ${session.sem} — Section ${session.section || "A"}`,
+      session.academic_year || academicYear,
+      `${turnout.turnout_percentage || 0}% (${turnout.completed_students || 0} / ${turnout.total_students || 0} Submitted)`,
+      `${sessionOverallRating || "0.00"} / 5.00 (${getPerformanceCategory(sessionOverallRating)})`
+    ]],
+    theme: "plain",
+    styles: {
+      fontSize: 7.8,
+      cellPadding: 2.2,
+      halign: "center",
+      font: "helvetica",
+      textColor: [15, 23, 42]
+    },
+    headStyles: {
+      fillColor: [241, 245, 249],
+      textColor: [71, 85, 105],
+      fontStyle: "bold",
+      fontSize: 7.4
+    },
+    bodyStyles: {
+      fontSize: 8.5,
+      fontStyle: "bold",
+      textColor: [30, 58, 138]
+    },
+    tableLineColor: [203, 213, 225],
+    tableLineWidth: 0.3,
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index === 4) {
+        data.cell.styles.textColor = [22, 101, 52]; // Green
+      }
+    }
+  });
+
+  // 2. Granular Faculty Detailed Evaluations (Faculty 1 starts immediately on Page 1)
+  faculties.forEach((f, fIdx) => {
+    let facultyStartY;
+    if (fIdx === 0) {
+      facultyStartY = doc.lastAutoTable.finalY + 5;
+    } else {
+      doc.addPage();
+      facultyStartY = 16;
+    }
+
+    // Section Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`FACULTY EVALUATION REPORT #${fIdx + 1}: ${f.name.toUpperCase()}`, 14, facultyStartY);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Subject: ${f.course_name} (${f.course_code})  |  Designation: ${f.designation || "Faculty"}`, 14, facultyStartY + 4.5);
+
+    // Faculty Header Info Card
+    const overallScore = `${f.avg_rating || "0.00"} / 5.00`;
+    const pct = f.score_percentage || ((parseFloat(f.avg_rating || 0) / 5) * 100).toFixed(1);
+    const grade = f.performance_category || getPerformanceCategory(f.avg_rating);
+    const submissionsCount = f.feedbacks_count || turnout.completed_students || 0;
+
+    autoTable(doc, {
+      startY: facultyStartY + 7,
+      head: [["Faculty Member Details", "Subject & Teaching Assignment", "Performance Summary"]],
+      body: [[
+        `Name: ${f.name || "Unknown"}\nDesignation: ${f.designation || "Faculty"}\nFaculty ID: ${f.faculty_id || "—"}\nEmail: ${f.email || "—"}`,
+        `Subject: ${f.course_name || "—"}\nCourse Code: ${f.course_code || "—"}\nClass: Semester ${session.sem} — Section ${session.section || "A"}\nDept: Dept. of ${session.dept_name || session.dept_id}`,
+        `Overall Rating: ${overallScore} (${pct}%)\nPerformance Grade: ${grade}\nEvaluated Responses: ${submissionsCount} Students\nAccreditation: NBA / NAAC Tier-1`
+      ]],
+      theme: "plain",
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2.2,
+        font: "helvetica",
+        textColor: [15, 23, 42]
+      },
+      headStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [30, 58, 138],
+        fontStyle: "bold",
+        fontSize: 7.5
+      },
+      tableLineColor: [203, 213, 225],
+      tableLineWidth: 0.3
+    });
+
+    // 4 Section / Heading Averages Strip
+    if (f.sections && f.sections.length > 0) {
+      const sectionStartY = doc.lastAutoTable.finalY + 3;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(30, 58, 138);
+      doc.text("Accreditation Section / Cluster Averages", 14, sectionStartY);
+
+      const sectionHeaders = f.sections.map(s => s.heading);
+      const sectionValues = f.sections.map(s => {
+        const sPct = s.score_percentage || ((parseFloat(s.avg_rating || 0) / 5) * 100).toFixed(1);
+        return `${s.avg_rating || "0.00"} / 5.00 (${sPct}%)\n${s.performance_category || getPerformanceCategory(s.avg_rating)}`;
+      });
+
+      autoTable(doc, {
+        startY: sectionStartY + 1.5,
+        head: [sectionHeaders],
+        body: [sectionValues],
+        theme: "plain",
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          halign: "center",
+          font: "helvetica"
+        },
+        headStyles: {
+          fillColor: [248, 250, 252],
+          textColor: [71, 85, 105],
+          fontStyle: "bold",
+          fontSize: 7
+        },
+        bodyStyles: {
+          fontStyle: "bold",
+          textColor: [15, 23, 42]
+        },
+        tableLineColor: [226, 232, 240],
+        tableLineWidth: 0.3,
+        didParseCell: (data) => {
+          if (data.section === "body") {
+            const rawVal = parseFloat(data.cell.raw);
+            if (!isNaN(rawVal) && rawVal >= 4.0) {
+              data.cell.styles.textColor = [22, 101, 52];
+            } else if (!isNaN(rawVal) && rawVal <= 3.0) {
+              data.cell.styles.textColor = [185, 28, 28];
+            }
+          }
+        }
+      });
+    }
+
+    // Comprehensive Question Table (with fallback)
+    const facultyQuestions = (f.questions && f.questions.length > 0)
+      ? f.questions
+      : (questionBreakdown || []).map((qb, qbIdx) => ({
+          question_number: qb.question_number || qbIdx + 1,
+          question_text: qb.question_text,
+          question_heading: qb.question_heading,
+          avg_rating: f.avg_rating || "0.00",
+          score_percentage: f.score_percentage || ((parseFloat(f.avg_rating || 0) / 5) * 100).toFixed(1),
+          performance_category: f.performance_category || getPerformanceCategory(f.avg_rating)
+        }));
+
+    if (facultyQuestions.length > 0) {
+      const fQStartY = doc.lastAutoTable.finalY + 3;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Detailed Question-by-Question Evaluation (${f.name} — ${f.course_code})`, 14, fQStartY);
+
+      const fQRows = facultyQuestions.map((q, qIdx) => {
+        const qRating = q.avg_rating || "0.00";
+        const qPct = q.score_percentage || ((parseFloat(qRating) / 5) * 100).toFixed(1);
+        return [
+          `Q${q.question_number || qIdx + 1}`,
+          q.question_text,
+          q.question_heading || "General Feedback",
+          `${qRating} / 5.00`,
+          `${qPct}%`,
+          q.performance_category || getPerformanceCategory(qRating)
+        ];
+      });
+
+      autoTable(doc, {
+        startY: fQStartY + 1.8,
+        head: [["Q#", "Question / Evaluation Parameter", "Accreditation Section", "Average Score", "Score %", "Benchmark Grade"]],
+        body: fQRows,
+        theme: "striped",
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 7.2,
+          halign: "center"
+        },
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.8,
+          font: "helvetica",
+          textColor: [30, 41, 59],
+          valign: "middle"
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        columnStyles: {
+          0: { halign: "center", cellWidth: 8, fontStyle: "bold" },
+          1: { cellWidth: 78 },
+          2: { cellWidth: 32, fontStyle: "bold", textColor: [71, 85, 105], fontSize: 6.8 },
+          3: { halign: "center", fontStyle: "bold", cellWidth: 22 },
+          4: { halign: "center", fontStyle: "bold", cellWidth: 16 },
+          5: { halign: "center", cellWidth: 24 }
+        },
+        didParseCell: (data) => {
+          if (data.section === "body" && (data.column.index === 3 || data.column.index === 4)) {
+            const r = parseFloat(data.row.raw[3]);
+            if (!isNaN(r) && r >= 4.0) data.cell.styles.textColor = [22, 101, 52];
+            else if (!isNaN(r) && r <= 3.0) data.cell.styles.textColor = [185, 28, 28];
+          }
+        }
+      });
+    }
+  });
+
+  // 5. PART 2: Master Comparative Evaluation Matrix Table
+  doc.addPage();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text("MASTER COMPARATIVE EVALUATION MATRIX (SESSION CROSS-COMPARISON)", 14, 18);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Side-by-side performance across all 15 feedback parameters for all assigned lecturers in this session cohort", 14, 23);
+
+  const matrixSource = (comparativeMatrix && comparativeMatrix.length > 0) ? comparativeMatrix : questionBreakdown;
+  const matrixRows = matrixSource.map((item, idx) => {
+    const qNum = `Q${item.question_number || idx + 1}`;
+    const qText = item.question_text || `Parameter ${idx + 1}`;
+    const fScores = faculties.map(f => {
+      if (item.faculty_scores) {
+        const match = item.faculty_scores.find(s => s.faculty_id === f.faculty_id && s.course_code === f.course_code);
+        return match ? `${match.avg_rating}` : "0.00";
+      }
+      const fq = (f.questions || []).find(q => q.question_id === item.question_id);
+      return fq ? `${fq.avg_rating}` : "0.00";
+    });
+    const sessMean = item.session_avg || item.avg_rating || "0.00";
+    return [qNum, qText, ...fScores, `${sessMean}`];
+  });
+
+  const matrixHeaders = [
+    "Q#",
+    "Evaluation Parameter / Question",
+    ...faculties.map(f => `${f.name}\n(${f.course_code})`),
+    "Session Mean"
+  ];
+
+  autoTable(doc, {
+    startY: 26,
+    head: [matrixHeaders],
+    body: matrixRows,
+    theme: "striped",
+    headStyles: {
+      fillColor: [30, 58, 138],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 7.5,
+      halign: "center"
+    },
+    styles: {
+      fontSize: 7.2,
+      cellPadding: 2,
+      font: "helvetica",
+      textColor: [30, 41, 59],
+      valign: "middle"
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252]
+    },
+    columnStyles: {
+      0: { halign: "center", cellWidth: 9, fontStyle: "bold" },
+      1: { cellWidth: 65 }
+    },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index >= 2) {
+        data.cell.styles.halign = "center";
+        data.cell.styles.fontStyle = "bold";
+        const score = parseFloat(data.cell.raw);
+        if (!isNaN(score) && score >= 4.0) data.cell.styles.textColor = [22, 101, 52];
+        else if (!isNaN(score) && score <= 3.0) data.cell.styles.textColor = [185, 28, 28];
+      }
+    }
+  });
+
+  // 6. Verification Signatures Block
+  let finalY = doc.lastAutoTable.finalY + 14;
+  if (finalY > pageHeight - 35) {
+    doc.addPage();
+    finalY = 30;
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+
+  const sigLeft = 20;
+  const sigRight = pageWidth - 70;
+
+  doc.text("....................................................", sigLeft, finalY);
+  doc.text("Head of Department (HOD)", sigLeft + 4, finalY + 4.5);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Dept. of ${session.dept_name || session.dept_id}`, sigLeft + 4, finalY + 8.5);
+
+  doc.setFont("helvetica", "normal");
+  doc.text("....................................................", sigRight, finalY);
+  doc.text("Principal / Academic Dean", sigRight + 4, finalY + 4.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("Maharaja Inst. of Technology Mysore", sigRight + 4, finalY + 8.5);
+
+  // Add Footers
+  addFooters(doc);
+
+  // Save the PDF
+  const safeSessionId = String(session.session_id || "Session").replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `MITM_Session_${safeSessionId}_Detailed_Report.pdf`;
+  doc.save(filename);
+};

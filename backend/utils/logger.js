@@ -76,4 +76,20 @@ const logActivity = async (req, dept_id, action_type, entity, description, statu
   }
 };
 
-module.exports = { logActivity };
+/**
+ * Specialized Security Incident Logger
+ * Records unauthorized access attempts, rate limit violations, authentication attacks, and privilege violations.
+ */
+const logSecurityAlert = async (req, dept_id, action_type, description, severity = 'WARNING') => {
+  const actor = req?.session?.role 
+    ? `${req.session.role.toUpperCase()}:${req.session.dept_id || req.session.faculty_id || req.session.usn || req.session.username || 'user'}`
+    : 'ANONYMOUS';
+  const targetPath = req?.originalUrl || req?.url || 'UNKNOWN_ROUTE';
+  const method = req?.method || '';
+  const enrichedDescription = `[SECURITY ALERT] [${actor}] ${method} ${targetPath} - ${description}`;
+  const cleanSeverity = severity === 'CRITICAL' || severity === 'FAILED' ? 'FAILED' : 'WARNING';
+  
+  await logActivity(req, dept_id || 'SECURITY', action_type || 'SECURITY_ALERT', 'SECURITY', enrichedDescription, cleanSeverity);
+};
+
+module.exports = { logActivity, logSecurityAlert };

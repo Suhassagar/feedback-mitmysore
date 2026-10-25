@@ -2,10 +2,24 @@ const express = require('express');
 const router = express.Router();
 const systemController = require('../controllers/systemController');
 const { isAdmin, isAdminOrDepartment, isAdminOrDepartmentOrFaculty } = require('../middleware/authMiddleware');
+const path = require('path');
 const multer = require('multer');
+
+const allowedLogoMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const allowedLogoExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (allowedLogoMimes.includes(file.mimetype) && allowedLogoExts.includes(ext)) {
+      return cb(null, true);
+    }
+    const err = new Error('Invalid image file type. Only JPEG, PNG, WEBP, and GIF are allowed.');
+    err.code = 'INVALID_FILE_TYPE';
+    cb(err);
+  }
 });
 
 router.get('/departments', systemController.getDepartments);
@@ -13,7 +27,7 @@ router.post('/department/add', isAdmin, upload.single('logo'), systemController.
 router.post('/department/:dept_id/logo', isAdminOrDepartment, upload.single('logo'), systemController.updateDepartmentLogo);
 
 router.post('/add-course', isAdminOrDepartment, systemController.addCourse);
-router.get('/get-courses/:dept_id', systemController.getCourses);
+router.get('/get-courses/:dept_id', isAdminOrDepartment, systemController.getCourses);
 
 router.get('/faculty/by-dept/:dept_id', isAdminOrDepartment, systemController.getFacultyByDept);
 router.post('/assign-subject', isAdminOrDepartment, systemController.assignSubject);

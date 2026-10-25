@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
+const { escapeHtml } = require('./sanitizer');
 
 let cachedTransporter = null;
 
@@ -23,9 +24,6 @@ const getTransporter = () => {
       auth: {
         user: cleanUser,
         pass: cleanPass,
-      },
-      tls: {
-        rejectUnauthorized: false
       },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
@@ -73,6 +71,12 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   const cleanUser = String(process.env.EMAIL_USER || '').trim();
   const loginUrl = process.env.FRONTEND_URL || 'https://mitmysore.vercel.app';
 
+  // Sanitize all dynamic variables against HTML / markup injection
+  const safeStudentName = escapeHtml(studentName || 'Student');
+  const safeUsn = escapeHtml(usn);
+  const safeSessionId = escapeHtml(sessionId);
+  const safeLoginUrl = escapeHtml(loginUrl);
+
   // Robust Logo Resolution: Check backend/public first, then monorepo frontend/public, fallback to live HTTPS
   const localBackendLogo = path.join(__dirname, '../public/logo.jpeg');
   const frontendLogo = path.join(__dirname, '../../frontend/public/logo.jpeg');
@@ -113,7 +117,7 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
         
         <!-- Body -->
         <div style="padding: 40px 30px;">
-          <p style="color: #0f172a; font-size: 18px; margin: 0 0 15px 0; font-weight: 600;">Hello ${studentName || 'Student'},</p>
+          <p style="color: #0f172a; font-size: 18px; margin: 0 0 15px 0; font-weight: 600;">Hello ${safeStudentName},</p>
           <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
             A new anonymous feedback session has been initiated for your department. Your honest evaluation is crucial for maintaining and improving our academic standards.
           </p>
@@ -126,25 +130,25 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
             <div style="margin-bottom: 15px;">
               <p style="margin: 0 0 5px 0; color: #64748b; font-size: 13px; font-weight: 500;">USN (Username)</p>
               <div style="background: #ffffff; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 10px; color: #0f172a; font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 1px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                ${usn}
+                ${safeUsn}
               </div>
             </div>
             
             <div>
               <p style="margin: 0 0 5px 0; color: #64748b; font-size: 13px; font-weight: 500;">Session ID (Password)</p>
               <div style="background: #ffffff; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 10px; color: #7C3AED; font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 1px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                ${sessionId}
+                ${safeSessionId}
               </div>
             </div>
           </div>
 
           <!-- Call to Action -->
           <div style="text-align: center;">
-            <a href="${loginUrl}" style="display: inline-block; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff; padding: 16px 36px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3); transition: transform 0.2s;">
+            <a href="${safeLoginUrl}" style="display: inline-block; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff; padding: 16px 36px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3); transition: transform 0.2s;">
               Access Feedback Portal
             </a>
             <p style="margin: 20px 0 0 0; color: #94a3b8; font-size: 14px;">
-              Or visit: <a href="${loginUrl}" style="color: #4F46E5; text-decoration: none; font-weight: 500;">${loginUrl}</a>
+              Or visit: <a href="${safeLoginUrl}" style="color: #4F46E5; text-decoration: none; font-weight: 500;">${safeLoginUrl}</a>
             </p>
           </div>
         </div>

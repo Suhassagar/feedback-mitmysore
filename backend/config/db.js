@@ -1,5 +1,17 @@
 const knex = require('knex');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Strict validation in production mode
+if (isProduction) {
+  if (!process.env.DB_PASSWORD) {
+    throw new Error("Fatal Database Configuration Error: DB_PASSWORD must be configured in production environment.");
+  }
+  if (!process.env.DB_HOST || process.env.DB_HOST === '127.0.0.1' || process.env.DB_HOST === 'localhost') {
+    console.warn("⚠️ [SECURITY WARNING] Production database host is configured as localhost/127.0.0.1. Ensure this is intentional.");
+  }
+}
+
 const dbOptions = {
   client: 'mysql2',
   connection: {
@@ -8,7 +20,10 @@ const dbOptions = {
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "college_feedback_system",
     port: Number(process.env.DB_PORT) || 3306,
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    ssl: process.env.DB_SSL === 'true' ? {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+      ca: process.env.DB_CA_CERT || undefined
+    } : false,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     connectTimeout: 30000,
@@ -156,6 +171,16 @@ async function ensurePerformanceIndexes() {
         });
         console.log('✅ Added logo_url, brand_color, brand_accent, and logo_lqip columns to department table');
       }
+    }
+
+    const facultyExists = await db.schema.hasTable('global_faculty');
+    if (facultyExists) {
+      await db.schema.hasColumn('global_faculty', 'must_change_password').then(async exists => {
+        if (!exists) {
+          await db.schema.table('global_faculty', t => t.boolean('must_change_password').defaultTo(false));
+          console.log('✅ Added missing must_change_password column to global_faculty');
+        }
+      });
     }
   } catch (err) {
     console.error('ensurePerformanceIndexes error:', err.message);

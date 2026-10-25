@@ -15,6 +15,7 @@ import OverallAnalyticsModal from "./OverallAnalyticsModal";
 import { useDepartmentName } from "../../../hooks/useDepartmentName";
 import ConfirmModal from "../../../components/ui/ConfirmModal";
 import EmptyState from "../../../components/ui/EmptyState";
+import FacultyAvatar from "../../../components/ui/FacultyAvatar";
 
 export default function FacultyProfile({ 
   selectedFaculty, 
@@ -250,13 +251,13 @@ export default function FacultyProfile({
             </div>
 
             <div className="faculty-profile-main" style={{ display: "flex", alignItems: "center", gap: "24px" }}>
-              <div style={{ position: "relative", width: "100px", height: "100px", flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "4px", boxShadow: "0 8px 24px var(--focus-ring)" }}>
-                <img 
-                  src={`https://ui-avatars.com/api/?name=${selectedFaculty.name.replace(" ", "+")}&background=random&color=fff&size=100`} 
-                  alt="avatar" 
-                  style={{ borderRadius: "50%", width: "100%", height: "100%", objectFit: "cover" }} 
+              <div style={{ position: "relative", width: "100px", height: "100px", flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "4px", boxShadow: "0 8px 24px var(--focus-ring)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <FacultyAvatar 
+                  name={selectedFaculty.name}
+                  photoUrl={selectedFaculty.profile_picture_url || facultyAnalytics?.profile?.profile_picture_url}
+                  size={92}
+                  showBadge={true}
                 />
-                <div style={{ position: "absolute", bottom: "4px", right: "4px", width: "20px", height: "20px", background: "#10B981", border: "4px solid #fff", borderRadius: "50%" }}></div>
               </div>
 
               <div>
@@ -328,13 +329,11 @@ export default function FacultyProfile({
 
             <div 
               className="card flex-col hoverable" 
-              style={{ padding: "16px", gap: "12px", borderRadius: "16px", cursor: "pointer", background: "linear-gradient(135deg, var(--focus-ring), var(--focus-ring))", border: "1px dashed var(--focus-ring)", transition: "all 0.2s" }}
+              style={{ padding: "16px", gap: "12px", borderRadius: "16px", cursor: "pointer" }}
               onClick={() => { setShowAssignModal(true); fetchDepartmentCourses(); }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "linear-gradient(135deg, var(--focus-ring), var(--focus-ring))"; e.currentTarget.style.borderColor = "var(--primary)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "linear-gradient(135deg, var(--focus-ring), var(--focus-ring))"; e.currentTarget.style.borderColor = "var(--focus-ring)"; }}
             >
-              <div style={{ background: "var(--primary)", width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px var(--focus-ring)" }}>
-                <Plus size={18} color="#fff" />
+              <div style={{ background: "var(--bg-light)", width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Plus size={18} color="var(--primary)" />
               </div>
               <div>
                 <div style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "700", marginBottom: "4px" }}>Quick Action</div>

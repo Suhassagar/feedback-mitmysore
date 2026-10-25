@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../services/apiClient";
@@ -10,6 +11,7 @@ import EmptyState from "../components/ui/EmptyState";
 
 export default function FacultyDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -217,6 +219,39 @@ export default function FacultyDashboard() {
           }
         `}
       </style>
+
+      {/* Forced Password Change Notice */}
+      {user?.must_change_password && (
+        <div style={{
+          background: '#FEF3C7',
+          border: '1px solid #F59E0B',
+          borderRadius: '12px',
+          padding: '14px 20px',
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>⚠️</span>
+            <div>
+              <strong style={{ color: '#92400E', fontSize: '14.5px' }}>Security Action Required: Default Password Detected</strong>
+              <p style={{ margin: '2px 0 0 0', color: '#B45309', fontSize: '13px' }}>
+                Your account is currently using the initial default password. To protect your student evaluations and profile, please update your password immediately.
+              </p>
+            </div>
+          </div>
+          <button 
+            className="btn btn-primary"
+            onClick={() => navigate('/faculty-settings')}
+            style={{ fontSize: '13px', padding: '8px 16px', borderRadius: '8px', background: '#D97706', borderColor: '#D97706', color: '#FFFFFF', cursor: 'pointer' }}
+          >
+            Change Password Now →
+          </button>
+        </div>
+      )}
 
       {/* Header Row */}
       <div className="header-row">

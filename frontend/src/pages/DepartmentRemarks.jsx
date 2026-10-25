@@ -4,6 +4,7 @@ import { useParams, useOutletContext } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { MessageSquare, Sparkles, Filter, Clock } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
+import { sanitizeUrl } from "../utils/urlSanitizer";
 import PageTransition from "../components/PageTransition";
 import { useSessions } from "../hooks/useSessions";
 import EmptyState from "../components/ui/EmptyState";
@@ -174,6 +175,20 @@ export default function DepartmentRemarks() {
                     strong: ({node, ...props}) => <strong style={{ color: "var(--navy)", fontWeight: "700" }} {...props} />,
                     ul: ({node, ...props}) => <ul style={{ paddingLeft: "24px", margin: "12px 0 24px 0" }} {...props} />,
                     li: ({node, ...props}) => <li style={{ marginBottom: "10px", paddingLeft: "8px" }} {...props} />,
+                    a: ({node, href, children, ...props}) => {
+                      const safeHref = sanitizeUrl(href);
+                      return (
+                        <a 
+                          href={safeHref} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          style={{ color: "var(--primary)", textDecoration: "underline" }} 
+                          {...props}
+                        >
+                          {children}
+                        </a>
+                      );
+                    },
                   }}
                 >
                   {aiSummary}

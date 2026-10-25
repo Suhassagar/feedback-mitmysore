@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import apiClient from "../../services/apiClient";
+import apiClient, { API_BASE_URL } from "../../services/apiClient";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Search, Building, CheckCircle2, Clock, ArrowRight, Loader2, Filter, LayoutDashboard } from "lucide-react";
+import { Calendar, Search, Building, CheckCircle2, Clock, ArrowRight, Loader2, Filter, LayoutDashboard, Download } from "lucide-react";
+import { io } from "socket.io-client";
 import PageTransition from "../../components/PageTransition";
+import SessionExportModal from "../../components/SessionExportModal";
 
 export default function AdminSessionCenter() {
   const [sessions, setSessions] = useState([]);
@@ -11,6 +13,7 @@ export default function AdminSessionCenter() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [deptFilter, setDeptFilter] = useState("ALL");
   const [searchTerm, setSearchTerm] = useState("");
+  const [exportSessionId, setExportSessionId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,6 +38,20 @@ export default function AdminSessionCenter() {
 
     fetchData();
     return () => { isMounted = false; };
+  }, []);
+
+  // Real-Time WebSocket Listener to refresh sessions upon student submission
+  useEffect(() => {
+    const socket = io(API_BASE_URL, { withCredentials: true });
+    socket.on("NEW_FEEDBACK_RECEIVED", () => {
+      apiClient.get("/admin/global-sessions", { withCredentials: true })
+        .then((res) => setSessions(res.data || []))
+        .catch((err) => console.error("Error refreshing admin sessions center:", err));
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const activeCount = sessions.filter((s) => s.status === "active").length;
@@ -206,6 +223,7 @@ export default function AdminSessionCenter() {
                     <th style={{ padding: "14px 18px" }}>Department</th>
                     <th style={{ padding: "14px 18px" }}>Cohort</th>
                     <th style={{ padding: "14px 18px" }}>Status</th>
+                    <th style={{ padding: "14px 18px" }}>Student Turnout</th>
                     <th style={{ padding: "14px 18px" }}>Created At</th>
                     <th style={{ padding: "14px 18px", textAlign: "right" }}>Actions</th>
                   </tr>
@@ -262,28 +280,84 @@ export default function AdminSessionCenter() {
                             </span>
                           )}
                         </td>
+                        <td style={{ padding: "14px 18px", minWidth: "160px" }}>
+                          {(() => {
+                            const pct = parseFloat(s.turnout_pct || 0);
+                            const turnoutColor = pct >= 75 ? "#166534" : pct >= 40 ? "#1E40AF" : "#92400E";
+                            const turnoutBg = pct >= 75 ? "#DCFCE7" : pct >= 40 ? "#DBEAFE" : "#FEF3C7";
+                            const barColor = pct >= 75 ? "#16A34A" : pct >= 40 ? "#2563EB" : "#D97706";
+
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "600" }}>
+                                  <span style={{ color: "#334155" }}>{s.completed_students || 0}/{s.total_students || 0}</span>
+                                  <span style={{
+                                    color: turnoutColor,
+                                    background: turnoutBg,
+                                    padding: "1px 6px",
+                                    borderRadius: "6px",
+                                    fontSize: "11px",
+                                    fontWeight: "700"
+                                  }}>
+                                    {pct}%
+                                  </span>
+                                </div>
+                                <div style={{ height: "6px", width: "100%", background: "#E2E8F0", borderRadius: "99px", overflow: "hidden" }}>
+                                  <div style={{
+                                    height: "100%",
+                                    width: `${Math.min(pct, 100)}%`,
+                                    background: barColor,
+                                    borderRadius: "99px",
+                                    transition: "width 0.4s ease"
+                                  }} />
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td style={{ padding: "14px 18px", color: "#64748B", fontSize: "13px" }}>
                           {s.created_at ? new Date(s.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "N/A"}
                         </td>
                         <td style={{ padding: "14px 18px", textAlign: "right" }}>
-                          <button
-                            onClick={() => navigate(`/manage-sessions/${s.dept_id}`)}
-                            className="btn hoverable"
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "12.5px",
-                              borderRadius: "8px",
-                              border: "1px solid #E2E8F0",
-                              background: "#ffffff",
-                              color: "#EA580C",
-                              fontWeight: "600",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            Manage <ArrowRight size={13} />
-                          </button>
+                          <div style={{ display: "inline-flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              onClick={() => setExportSessionId(s.session_id)}
+                              className="btn hoverable"
+                              title="Export Consolidated Session Report"
+                              style={{
+                                padding: "6px 11px",
+                                fontSize: "12.5px",
+                                borderRadius: "8px",
+                                border: "1px solid #CBD5E1",
+                                background: "#ffffff",
+                                color: "#2563EB",
+                                fontWeight: "600",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                            >
+                              <Download size={13} /> Report
+                            </button>
+                            <button
+                              onClick={() => navigate(`/manage-sessions/${s.dept_id}`)}
+                              className="btn hoverable"
+                              style={{
+                                padding: "6px 11px",
+                                fontSize: "12.5px",
+                                borderRadius: "8px",
+                                border: "1px solid #E2E8F0",
+                                background: "#ffffff",
+                                color: "#EA580C",
+                                fontWeight: "600",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                            >
+                              Manage <ArrowRight size={13} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -293,6 +367,13 @@ export default function AdminSessionCenter() {
             </div>
           )}
         </div>
+
+        {/* SESSION CONSOLIDATED EXPORT MODAL */}
+        <SessionExportModal
+          isOpen={!!exportSessionId}
+          onClose={() => setExportSessionId(null)}
+          sessionId={exportSessionId}
+        />
 
       </div>
     </PageTransition>

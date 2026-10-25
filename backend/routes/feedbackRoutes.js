@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const feedbackController = require('../controllers/feedbackController');
-const { isAdminOrDepartment, isAdminOrDepartmentOrFaculty } = require('../middleware/authMiddleware');
-const { sensitiveLimiter } = require('../middleware/rateLimiter');
+const { isAdminOrDepartment, isAdminOrDepartmentOrFaculty, isStudent } = require('../middleware/authMiddleware');
+const { sensitiveLimiter, feedbackSubmissionLimiter } = require('../middleware/rateLimiter');
 
-router.get('/feedback/token', feedbackController.generateToken);
-router.get('/feedback/timing/:session_id', feedbackController.getFeedbackTiming);
-router.get('/student/subjects/:session_id', feedbackController.getStudentSubjects);
-router.post('/submit-feedback', sensitiveLimiter, feedbackController.submitFeedback);
+router.get('/feedback/token', isStudent, feedbackController.generateToken);
+router.get('/feedback/timing/:session_id', isStudent, feedbackController.getFeedbackTiming);
+router.get('/student/subjects/:session_id', isStudent, feedbackController.getStudentSubjects);
+router.post('/submit-feedback', isStudent, feedbackSubmissionLimiter, feedbackController.submitFeedback);
 
-router.get('/questions/:dept_id', feedbackController.getQuestions);
-router.get('/student/questions/:session_id', feedbackController.getStudentQuestions);
+router.get('/questions/:dept_id', isAdminOrDepartment, feedbackController.getQuestions);
+router.get('/student/questions/:session_id', isStudent, feedbackController.getStudentQuestions);
 
 router.post('/department/questions', isAdminOrDepartment, sensitiveLimiter, feedbackController.addQuestion);
 router.post('/department/questions/bulk', isAdminOrDepartment, sensitiveLimiter, feedbackController.bulkUploadQuestions);

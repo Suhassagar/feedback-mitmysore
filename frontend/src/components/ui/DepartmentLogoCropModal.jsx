@@ -267,6 +267,10 @@ export default function DepartmentLogoCropModal({
               max="3"
               step="0.05"
               value={zoom}
+              aria-label="Logo Crop Zoom Level"
+              aria-valuemin={0.8}
+              aria-valuemax={3}
+              aria-valuenow={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
               style={{ flex: 1, accentColor: '#38BDF8', cursor: 'pointer' }}
             />

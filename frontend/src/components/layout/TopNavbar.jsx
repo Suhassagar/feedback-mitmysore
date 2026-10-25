@@ -22,7 +22,19 @@ export default function TopNavbar({ dept_id }) {
   const deptProfile = useDepartmentProfile(dept_id);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileRef = useRef(null);
+  const inputRef = useRef(null);
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -73,6 +85,7 @@ export default function TopNavbar({ dept_id }) {
         <div className="header-search" ref={searchRef}>
         <Search size={18} />
         <input
+          ref={inputRef}
           type="text"
           placeholder="Search students, faculty, sessions..."
           value={globalSearchQuery}

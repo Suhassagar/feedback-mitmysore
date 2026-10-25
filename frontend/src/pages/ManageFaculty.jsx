@@ -11,6 +11,7 @@ import FacultyProfile from "../features/faculty/components/FacultyProfile";
 import { useFaculties } from "../hooks/useFaculties";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import EmptyState from "../components/ui/EmptyState";
+import FacultyAvatar from "../components/ui/FacultyAvatar";
 
 export default function ManageFaculty() {
   const { dept_id } = useParams();
@@ -249,17 +250,12 @@ export default function ManageFaculty() {
                 <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
                   
                   {/* Avatar */}
-                  <div style={{ position: "relative", width: "72px", height: "72px", flexShrink: 0 }}>
-                    <img 
-                      src={`https://ui-avatars.com/api/?name=${f.name.replace(" ", "+")}&background=random&color=fff&size=72`}
-                      alt={f.name}
-                      style={{ borderRadius: "50%", width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                    <div style={{ 
-                      position: "absolute", bottom: "2px", right: "2px", width: "16px", height: "16px", 
-                      background: "#10B981", border: "3px solid #fff", borderRadius: "50%" 
-                    }}></div>
-                  </div>
+                  <FacultyAvatar 
+                    name={f.name}
+                    photoUrl={f.profile_picture_url}
+                    size={72}
+                    showBadge={true}
+                  />
 
                   {/* Info */}
                   <div style={{ flex: 1, paddingRight: "10px" }}>

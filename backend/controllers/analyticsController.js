@@ -48,9 +48,44 @@ const getDepartmentAnalytics = async (req, res) => {
 const getFacultyAnalytics = async (req, res) => {
   const { faculty_id } = req.params;
   const { course_id, sem, section } = req.query;
-  const dept_id = req.session.dept_id || req.query.dept_id; // Added dept_id for global schema
+  const { role, faculty_id: session_faculty_id, dept_id: session_dept_id } = req.session || {};
+
+  if (!faculty_id || typeof faculty_id !== 'string') {
+    return res.status(400).json({ error: "Invalid faculty ID" });
+  }
+
+  const cleanFacultyId = faculty_id.trim();
+
+  // BOLA Defense: Faculty can strictly ONLY access their own evaluation analytics
+  if (role === 'faculty') {
+    if (!session_faculty_id || session_faculty_id.toLowerCase() !== cleanFacultyId.toLowerCase()) {
+      return res.status(403).json({ 
+        error: "Forbidden: You are strictly authorized to view your own performance analytics only." 
+      });
+    }
+  }
 
   try {
+    // 0. Auto-resolve Faculty Record & Department
+    const facultyRecord = await db('global_faculty')
+      .whereRaw('LOWER(faculty_id) = ?', [cleanFacultyId.toLowerCase()])
+      .first();
+
+    if (!facultyRecord) {
+      return res.status(404).json({ error: `Faculty member '${cleanFacultyId}' not found` });
+    }
+
+    // BOLA Defense: Department HODs can strictly ONLY view analytics for faculty in their own department
+    if (role === 'department') {
+      if (!session_dept_id || session_dept_id.toUpperCase() !== (facultyRecord.dept_id || '').toUpperCase()) {
+        return res.status(403).json({ 
+          error: "Forbidden: Cross-department faculty performance access is strictly prohibited." 
+        });
+      }
+    }
+
+    const effectiveDeptId = (role === 'department' ? session_dept_id : (facultyRecord.dept_id || '')).trim();
+
     let filterClause = {};
     if (course_id && sem && section) {
       filterClause = {
@@ -60,24 +95,27 @@ const getFacultyAnalytics = async (req, res) => {
       };
     }
 
-    // 0. Faculty Profile
+    // 0b. Faculty Profile
     const profile = await db('global_faculty as f')
-      .join('department as d', 'f.dept_id', 'd.dept_id')
-      .where({ 'f.faculty_id': faculty_id, 'f.dept_id': dept_id })
-      .select('f.faculty_id', 'f.name', 'f.email', 'd.dept_name', 'f.joining_date', 'f.dob', 'f.profile_picture_url')
+      .leftJoin('department as d', db.raw('UPPER(f.dept_id) = UPPER(d.dept_id)'))
+      .whereRaw('LOWER(f.faculty_id) = ?', [cleanFacultyId.toLowerCase()])
+      .select('f.faculty_id', 'f.name', 'f.email', 'f.position as designation', 'd.dept_name', 'f.dept_id', 'f.joining_date', 'f.dob', 'f.profile_picture_url')
       .first();
 
     // 1. Overall Stats
     let statsQuery = db('global_faculty_scorecards as sc')
       .leftJoin('global_sessions as s', function() {
-        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+        this.on('sc.session_id', '=', 's.session_id').andOn(db.raw('UPPER(sc.dept_id) = UPPER(s.dept_id)'));
       })
-      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
+      .whereRaw('LOWER(sc.faculty_id) = ?', [cleanFacultyId.toLowerCase()])
       .select(
-        db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.genuine_count), 0), 0), 2) as avg_rating'),
-        db.raw('SUM(sc.ratings_count) as total_feedback')
+        db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.ratings_count), 0), 0), 2) as avg_rating'),
+        db.raw('COALESCE(SUM(sc.ratings_count), 0) as total_feedback')
       );
       
+    if (effectiveDeptId) {
+      statsQuery = statsQuery.andWhereRaw('UPPER(sc.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
     if (course_id && sem && section) {
       statsQuery = statsQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
     }
@@ -86,16 +124,19 @@ const getFacultyAnalytics = async (req, res) => {
     // 2. Rating Distribution
     let distQuery = db('global_faculty_scorecards as sc')
       .leftJoin('global_sessions as s', function() {
-        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+        this.on('sc.session_id', '=', 's.session_id').andOn(db.raw('UPPER(sc.dept_id) = UPPER(s.dept_id)'));
       })
-      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
+      .whereRaw('LOWER(sc.faculty_id) = ?', [cleanFacultyId.toLowerCase()])
       .select(
-        db.raw('SUM(sc.excellent_count) as excellent'),
-        db.raw('SUM(sc.good_count) as good'),
-        db.raw('SUM(sc.average_count) as average'),
-        db.raw('SUM(sc.poor_count) as poor')
+        db.raw('COALESCE(SUM(sc.excellent_count), 0) as excellent'),
+        db.raw('COALESCE(SUM(sc.good_count), 0) as good'),
+        db.raw('COALESCE(SUM(sc.average_count), 0) as average'),
+        db.raw('COALESCE(SUM(sc.poor_count), 0) as poor')
       );
       
+    if (effectiveDeptId) {
+      distQuery = distQuery.andWhereRaw('UPPER(sc.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
     if (course_id && sem && section) {
       distQuery = distQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
     }
@@ -104,83 +145,109 @@ const getFacultyAnalytics = async (req, res) => {
     // 3. Trend Data
     let trendQuery = db('global_faculty_scorecards as sc')
       .join('global_sessions as s', function() {
-        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+        this.on('sc.session_id', '=', 's.session_id').andOn(db.raw('UPPER(sc.dept_id) = UPPER(s.dept_id)'));
       })
-      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
-      .select('s.sem', db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.genuine_count), 0), 0), 2) as avg_rating'))
+      .whereRaw('LOWER(sc.faculty_id) = ?', [cleanFacultyId.toLowerCase()])
+      .select('s.sem', db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.ratings_count), 0), 0), 2) as avg_rating'))
       .groupBy('s.sem')
       .orderBy('s.sem', 'asc');
       
+    if (effectiveDeptId) {
+      trendQuery = trendQuery.andWhereRaw('UPPER(sc.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
     if (course_id && sem && section) {
       trendQuery = trendQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
     }
     const trendData = await trendQuery;
 
     // 4. Question-level breakdown (Composite key join on question_id + dept_id)
-    const radarData = await db('global_student_feedback as sf')
+    let radarQuery = db('global_student_feedback as sf')
       .join('global_feedback_questions as q', function() {
-        this.on('sf.question_id', '=', 'q.question_id').andOn('sf.dept_id', '=', 'q.dept_id');
+        this.on('sf.question_id', '=', 'q.question_id').andOn(db.raw('UPPER(sf.dept_id) = UPPER(q.dept_id)'));
       })
       .leftJoin('global_sessions as s', function() {
-        this.on('sf.session_id', '=', 's.session_id').andOn('sf.dept_id', '=', 's.dept_id');
+        this.on('sf.session_id', '=', 's.session_id').andOn(db.raw('UPPER(sf.dept_id) = UPPER(s.dept_id)'));
       })
-      .where({ 'sf.faculty_id': faculty_id, 'sf.dept_id': dept_id, 'sf.is_genuine': true })
+      .whereRaw('LOWER(sf.faculty_id) = ? AND sf.is_genuine = 1', [cleanFacultyId.toLowerCase()])
       .andWhere(filterClause)
       .select('q.question_text as question', db.raw('ROUND(COALESCE(AVG(sf.rating), 0), 2) as avg_rating'))
       .groupBy('sf.question_id', 'q.question_text');
 
+    if (effectiveDeptId) {
+      radarQuery = radarQuery.andWhereRaw('UPPER(sf.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
+    const radarData = await radarQuery;
+
     // 5. Subject-level breakdown (Includes section filterClause)
     let subjectQuery = db('global_faculty_scorecards as sc')
       .join('global_course as c', function() {
-        this.on('sc.course_id', '=', 'c.course_code').andOn('sc.dept_id', '=', 'c.dept_id');
+        this.on('sc.course_id', '=', 'c.course_code').andOn(db.raw('UPPER(sc.dept_id) = UPPER(c.dept_id)'));
       })
       .leftJoin('global_sessions as s', function() {
-        this.on('sc.session_id', '=', 's.session_id').andOn('sc.dept_id', '=', 's.dept_id');
+        this.on('sc.session_id', '=', 's.session_id').andOn(db.raw('UPPER(sc.dept_id) = UPPER(s.dept_id)'));
       })
-      .where({ 'sc.faculty_id': faculty_id, 'sc.dept_id': dept_id })
-      .select('c.course_name', 'c.course_code', db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.genuine_count), 0), 0), 2) as avg_rating'))
+      .whereRaw('LOWER(sc.faculty_id) = ?', [cleanFacultyId.toLowerCase()])
+      .select('c.course_name', 'c.course_code', db.raw('ROUND(COALESCE(SUM(sc.total_score_sum) / NULLIF(SUM(sc.ratings_count), 0), 0), 2) as avg_rating'))
       .groupBy('sc.course_id', 'c.course_name', 'c.course_code');
       
+    if (effectiveDeptId) {
+      subjectQuery = subjectQuery.andWhereRaw('UPPER(sc.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
     if (course_id && sem && section) {
       subjectQuery = subjectQuery.andWhere({ 'sc.course_id': course_id, 's.sem': sem, 's.section': section });
     }
     const subjectData = await subjectQuery;
 
     // 6. Assigned Subjects & Student Participation
-    const assignedSubjects = await db('global_assign as a')
+    let assignQuery = db('global_assign as a')
       .join('global_course as c', function() {
-        this.on('a.course_code', '=', 'c.course_code').andOn('a.dept_id', '=', 'c.dept_id');
+        this.on('a.course_code', '=', 'c.course_code').andOn(db.raw('UPPER(a.dept_id) = UPPER(c.dept_id)'));
       })
-      .where({ 'a.faculty_id': faculty_id, 'a.dept_id': dept_id })
+      .whereRaw('LOWER(a.faculty_id) = ?', [cleanFacultyId.toLowerCase()])
       .select(
         'a.course_code', 'c.course_name', 'a.sem', 'a.section',
-        db.raw(`(SELECT COUNT(*) FROM global_students s WHERE s.sem = a.sem AND s.section = a.section AND s.session_id IS NOT NULL AND s.dept_id = ?) as total_students`, [dept_id]),
-        db.raw(`(SELECT COUNT(*) FROM global_students s WHERE s.sem = a.sem AND s.section = a.section AND s.feedback_given = 'done' AND s.session_id IS NOT NULL AND s.dept_id = ?) as completed_students`, [dept_id])
+        db.raw(`(SELECT COUNT(*) FROM global_students s WHERE s.sem = a.sem AND s.section = a.section AND s.session_id IS NOT NULL AND UPPER(s.dept_id) = UPPER(?)) as total_students`, [effectiveDeptId || '']),
+        db.raw(`(SELECT COUNT(*) FROM global_students s WHERE s.sem = a.sem AND s.section = a.section AND s.feedback_given = 'done' AND s.session_id IS NOT NULL AND UPPER(s.dept_id) = UPPER(?)) as completed_students`, [effectiveDeptId || ''])
       );
 
+    if (effectiveDeptId) {
+      assignQuery = assignQuery.andWhereRaw('UPPER(a.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
+    const assignedSubjects = await assignQuery;
+
     // Active sessions
-    const activeSessions = await db('global_assign as a')
+    let activeSessionsQuery = db('global_assign as a')
       .join('global_sessions as s', function() {
-        this.on('a.sem', '=', 's.sem').andOn('a.section', '=', 's.section').andOn('a.dept_id', '=', 's.dept_id');
+        this.on('a.sem', '=', 's.sem').andOn('a.section', '=', 's.section').andOn(db.raw('UPPER(a.dept_id) = UPPER(s.dept_id)'));
       })
-      .where({ 'a.faculty_id': faculty_id, 'a.dept_id': dept_id, 's.status': 'active' })
-      .select(db.raw('COUNT(DISTINCT a.sem, a.section) as active_sessions'))
-      .first();
+      .whereRaw('LOWER(a.faculty_id) = ? AND s.status = ?', [cleanFacultyId.toLowerCase(), 'active'])
+      .select(db.raw('COUNT(DISTINCT a.sem, a.section) as active_sessions'));
+
+    if (effectiveDeptId) {
+      activeSessionsQuery = activeSessionsQuery.andWhereRaw('UPPER(a.dept_id) = UPPER(?)', [effectiveDeptId]);
+    }
+    const activeSessions = await activeSessionsQuery.first();
 
     res.json({
-      profile: profile || { name: 'Unknown', email: 'N/A', dept_name: 'Unknown', faculty_id },
+      profile: profile || { 
+        name: facultyRecord?.name || 'Faculty Member', 
+        email: facultyRecord?.email || 'N/A', 
+        dept_name: effectiveDeptId || 'Department', 
+        faculty_id: facultyRecord?.faculty_id || cleanFacultyId,
+        designation: facultyRecord?.position || 'Faculty'
+      },
       avgRating: stats?.avg_rating ? parseFloat(stats.avg_rating).toFixed(2) : "0.00",
       totalFeedback: stats?.total_feedback || 0,
       distribution: {
-        excellent: parseInt(distribution?.excellent) || 0,
-        good: parseInt(distribution?.good) || 0,
-        average: parseInt(distribution?.average) || 0,
-        poor: parseInt(distribution?.poor) || 0
+        excellent: parseInt(distribution?.excellent, 10) || 0,
+        good: parseInt(distribution?.good, 10) || 0,
+        average: parseInt(distribution?.average, 10) || 0,
+        poor: parseInt(distribution?.poor, 10) || 0
       },
-      trendData,
-      radarData,
-      subjectData,
-      assignedSubjects,
+      trendData: trendData || [],
+      radarData: radarData || [],
+      subjectData: subjectData || [],
+      assignedSubjects: assignedSubjects || [],
       activeSessionsCount: activeSessions?.active_sessions || 0
     });
 
