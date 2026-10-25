@@ -58,7 +58,6 @@ export default function StudentLogin() {
                 </svg>
               </div>
               <h2>Student Login</h2>
-              <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--text-secondary)" }}>MITM ABHIPRAYA • Evaluation Portal</p>
             </div>
 
             <form onSubmit={handleSubmit}>
