@@ -417,7 +417,7 @@ export default function AdminDepartments() {
           </button>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: "24px" }}>
           {filteredDepartments.map(dept => {
             const rating = dept.avg_rating ? parseFloat(dept.avg_rating) : 0;
             const ratingPercent = rating > 0 ? (rating / 5) * 100 : 0;
