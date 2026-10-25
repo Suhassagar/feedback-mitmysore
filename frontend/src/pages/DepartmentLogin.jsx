@@ -76,6 +76,7 @@ export default function DepartmentLogin() {
                 </svg>
               </div>
               <h2>Department Login</h2>
+              <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--text-secondary)" }}>MITM ABHIPRAYA • HOD Portal</p>
             </div>
 
             <form onSubmit={handleSubmit}>

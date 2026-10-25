@@ -360,10 +360,10 @@ export default function FeedbackForm() {
         <header className="eval-header-bar">
           <div className="eval-header-inner">
             <div className="eval-brand-group">
-              <img src="/logo.jpeg" alt="MIT Mysore Logo" className="eval-college-logo" />
+              <img src="/logo.jpeg" alt="MITM ABHIPRAYA Logo" className="eval-college-logo" />
               <div className="eval-title-block">
                 <span className="eval-college-name">Maharaja Institute of Technology Mysore</span>
-                <span className="eval-portal-name">Course & Faculty Evaluation Portal</span>
+                <span className="eval-portal-name">MITM ABHIPRAYA • Course & Faculty Evaluation Portal</span>
               </div>
             </div>
 

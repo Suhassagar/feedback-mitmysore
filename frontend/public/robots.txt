@@ -1,5 +1,17 @@
 User-agent: *
 Allow: /
+Allow: /student-login
+Allow: /faculty-login
+Allow: /department-login
+Allow: /admin-login
+
+# Disallow authenticated session data and back-office portals from search indexing
+Disallow: /feedback
+Disallow: /department-dashboard/
+Disallow: /manage-*
+Disallow: /admin/*
+Disallow: /audit-logs/
+Disallow: /department-settings/
 
 # Sitemap Index
 Sitemap: https://mitmysore.vercel.app/sitemap.xml

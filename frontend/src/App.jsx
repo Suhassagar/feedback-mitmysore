@@ -50,26 +50,26 @@ function App() {
 
   useEffect(() => {
     const titles = {
-      '/': 'Maharaja Institute of Technology Mysore | Faculty & Course Feedback Portal',
-      '/admin-login': 'Admin Login | MIT Mysore',
-      '/department-login': 'Department Login | MIT Mysore',
-      '/student-login': 'Student Login | MIT Mysore',
-      '/faculty-login': 'Faculty Login | MIT Mysore',
-      '/admin-dashboard': 'Admin Dashboard | MIT Mysore',
-      '/faculty-dashboard': 'Faculty Dashboard | MIT Mysore',
-      '/faculty-settings': 'Faculty Settings | MIT Mysore',
-      '/faculty-profile': 'Faculty Profile | MIT Mysore',
-      '/feedback': 'Student Feedback Evaluation | MIT Mysore'
+      '/': 'MITM ABHIPRAYA | Faculty & Course Feedback Evaluation System',
+      '/admin-login': 'Admin Login | MITM ABHIPRAYA',
+      '/department-login': 'Department Login | MITM ABHIPRAYA',
+      '/student-login': 'Student Login | MITM ABHIPRAYA',
+      '/faculty-login': 'Faculty Login | MITM ABHIPRAYA',
+      '/admin-dashboard': 'Admin Dashboard | MITM ABHIPRAYA',
+      '/faculty-dashboard': 'Faculty Dashboard | MITM ABHIPRAYA',
+      '/faculty-settings': 'Faculty Settings | MITM ABHIPRAYA',
+      '/faculty-profile': 'Faculty Profile | MITM ABHIPRAYA',
+      '/feedback': 'Student Feedback Evaluation | MITM ABHIPRAYA'
     };
 
     if (titles[location.pathname]) {
       document.title = titles[location.pathname];
     } else if (location.pathname.startsWith('/department-dashboard')) {
-      document.title = 'Department Dashboard | MIT Mysore';
+      document.title = 'Department Dashboard | MITM ABHIPRAYA';
     } else if (location.pathname.startsWith('/manage-') || location.pathname.startsWith('/add-course') || location.pathname.startsWith('/department-')) {
-      document.title = 'Department Management | MIT Mysore';
+      document.title = 'Department Management | MITM ABHIPRAYA';
     } else if (location.pathname.startsWith('/admin/')) {
-      document.title = 'Admin Center | MIT Mysore';
+      document.title = 'Admin Center | MITM ABHIPRAYA';
     }
   }, [location.pathname]);
 

@@ -112,7 +112,7 @@ export default function FacultyLayout() {
           }}>
             <img src="/logo.jpeg" alt="College Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
           </div>
-          <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#ffffff', letterSpacing: '1px', whiteSpace: 'nowrap' }}>MIT MYSORE</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#ffffff', letterSpacing: '1px', whiteSpace: 'nowrap' }}>MITM ABHIPRAYA</h2>
         </div>
 
         {/* Navigation */}
@@ -226,7 +226,7 @@ export default function FacultyLayout() {
            <button onClick={() => setIsMobileMenuOpen(true)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#0F172A' }}>
              <Menu size={24} />
            </button>
-           <h3 style={{ margin: '0 0 0 16px', fontSize: '16px', fontWeight: 600 }}>MIT Mysore</h3>
+           <h3 style={{ margin: '0 0 0 16px', fontSize: '16px', fontWeight: 600 }}>MITM ABHIPRAYA</h3>
         </div>
 
         <PageTransition>

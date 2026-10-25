@@ -111,7 +111,7 @@ const addFooters = (doc) => {
     doc.setLineWidth(0.3);
     doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
 
-    doc.text("Maharaja Institute of Technology Mysore • Official Academic Feedback Audit Record", 14, pageHeight - 7);
+    doc.text("MITM ABHIPRAYA • Maharaja Institute of Technology Mysore • Official Academic Feedback Audit Record", 14, pageHeight - 7);
     doc.text(`Generated on: ${timestamp}  |  Page ${i} of ${totalPages}`, pageWidth - 14, pageHeight - 7, { align: "right" });
   }
 };
