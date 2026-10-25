@@ -72,6 +72,7 @@ function AdminLogin() {
                 </svg>
               </div>
               <h2>Administrator Login</h2>
+              <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--text-secondary)" }}>MITM ABHIPRAYA • Central Administration</p>
             </div>
 
             <form onSubmit={handleLogin}>

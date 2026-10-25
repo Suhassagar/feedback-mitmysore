@@ -84,10 +84,10 @@ export const AuthProvider = ({ children }) => {
           </div>
 
           <h2 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 8px 0', letterSpacing: '-0.3px', color: '#FFFFFF' }}>
-            MIT Mysore
+            MITM ABHIPRAYA
           </h2>
           <p style={{ fontSize: '13px', color: '#94A3B8', margin: '0 0 28px 0', fontWeight: '500' }}>
-            Student Feedback & Analytics Platform
+            Student Feedback & Course Appraisal System
           </p>
 
           <div style={{

@@ -44,7 +44,7 @@ export default function Sidebar({ dept_id }) {
         }}>
           <img src="/logo.jpeg" alt="College Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
         </div>
-        {!isSidebarCollapsed && <h2 style={{ fontSize: "18px", fontWeight: "800", color: "white", letterSpacing: "1px", whiteSpace: "nowrap" }}>MIT MYSORE</h2>}
+        {!isSidebarCollapsed && <h2 style={{ fontSize: "16px", fontWeight: "800", color: "white", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>MITM ABHIPRAYA</h2>}
       </div>
 
       <nav style={{ flex: 1 }}>

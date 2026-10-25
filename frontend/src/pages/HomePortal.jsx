@@ -81,8 +81,11 @@ export default function HomePortal() {
           </div>
 
           <div className="home-hero-text">
-            <h1>Student Feedback<br />Management System</h1>
-            <p>Your feedback shapes better tomorrow.</p>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(217, 119, 6, 0.2)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#FCD34D', padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '12px', textTransform: 'uppercase' }}>
+              ಅಭಿಪ್ರಾಯ • ACADEMIC APPRAISAL
+            </div>
+            <h1 style={{ letterSpacing: '-0.5px' }}>MITM ABHIPRAYA<br /><span style={{ fontSize: '0.75em', fontWeight: 600, opacity: 0.92, display: 'block', marginTop: '6px' }}>Student Feedback & Course Evaluation Portal</span></h1>
+            <p>Your authentic voice shapes institutional academic excellence.</p>
           </div>
 
           <div className="home-quote-box">

@@ -45,7 +45,7 @@ export default function AdminLayout() {
               <img src="/logo.jpeg" alt="College Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: "16px", fontWeight: "800", color: "#FFFFFF", letterSpacing: "1px", whiteSpace: "nowrap" }}>MIT MYSORE</span>
+              <span style={{ fontSize: "16px", fontWeight: "800", color: "#FFFFFF", letterSpacing: "1px", whiteSpace: "nowrap" }}>MITM ABHIPRAYA</span>
               <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: "500", marginTop: "1px" }}>Central Admin Portal</span>
             </div>
           </div>

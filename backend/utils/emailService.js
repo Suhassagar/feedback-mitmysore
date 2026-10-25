@@ -111,15 +111,15 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
           <div style="background: #ffffff; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 5px;">
             <img src="${logoImgSrc}" alt="MITM Logo" style="width: 100%; height: auto; border-radius: 50%; object-fit: contain;" />
           </div>
-          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Feedback Session Live</h1>
-          <p style="color: rgba(255,255,255,0.85); margin: 10px 0 0 0; font-size: 16px; font-weight: 500;">Your insights shape our future.</p>
+          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">MITM ABHIPRAYA</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 15px; font-weight: 500;">Academic Feedback Session Live</p>
         </div>
         
         <!-- Body -->
         <div style="padding: 40px 30px;">
           <p style="color: #0f172a; font-size: 18px; margin: 0 0 15px 0; font-weight: 600;">Hello ${safeStudentName},</p>
           <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-            A new anonymous feedback session has been initiated for your department. Your honest evaluation is crucial for maintaining and improving our academic standards.
+            A new anonymous feedback session has been initiated for your department on the <strong>MITM ABHIPRAYA</strong> portal. Your honest evaluation is crucial for maintaining and improving our academic standards.
           </p>
           
           <!-- Credentials Card -->
@@ -156,7 +156,7 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
         <!-- Footer -->
         <div style="background-color: #f8fafc; padding: 25px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
           <p style="color: #64748b; font-size: 13px; margin: 0 0 10px 0; font-weight: 500;">🔒 Your feedback is 100% anonymous</p>
-          <p style="color: #94a3b8; font-size: 12px; margin: 0;">This is an automated message from the College Administration. Please do not reply.</p>
+          <p style="color: #94a3b8; font-size: 12px; margin: 0;">This is an automated message from Maharaja Institute of Technology Mysore (MITM ABHIPRAYA). Please do not reply.</p>
         </div>
         
       </div>
@@ -165,9 +165,9 @@ const sendFeedbackEmail = async (studentEmail, studentName, usn, sessionId) => {
   `;
 
   const mailOptions = {
-    from: `"College Admin" <${cleanUser}>`,
+    from: `"MITM ABHIPRAYA" <${cleanUser}>`,
     to: studentEmail,
-    subject: `Action Required: New Feedback Session (${sessionId})`,
+    subject: `[MITM ABHIPRAYA] Action Required: New Feedback Session (${sessionId})`,
     html: htmlContent,
     attachments
   };

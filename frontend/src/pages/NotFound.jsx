@@ -9,13 +9,13 @@ export default function NotFound() {
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    document.title = "404 - Page Not Found | MIT Mysore";
+    document.title = "404 - Page Not Found | MITM ABHIPRAYA";
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          document.title = "Maharaja Institute of Technology Mysore | Faculty & Course Feedback Portal";
+          document.title = "MITM ABHIPRAYA | Student Feedback & Course Appraisal Portal";
           navigate('/', { replace: true });
           return 0;
         }
@@ -25,7 +25,7 @@ export default function NotFound() {
 
     return () => {
       clearInterval(timer);
-      document.title = "Maharaja Institute of Technology Mysore | Faculty & Course Feedback Portal";
+      document.title = "MITM ABHIPRAYA | Student Feedback & Course Appraisal Portal";
     };
   }, [navigate]);
 
@@ -33,10 +33,10 @@ export default function NotFound() {
     <div className="simple-404-wrapper">
       <main className="simple-404-card">
         <div className="simple-404-header">
-          <img src="/logo.jpeg" alt="MIT Mysore Logo" className="simple-404-logo" />
+          <img src="/logo.jpeg" alt="MITM ABHIPRAYA Logo" className="simple-404-logo" />
           <div className="simple-404-college">
             <strong>Maharaja Institute of Technology Mysore</strong>
-            <span>Student Feedback Management System</span>
+            <span>MITM ABHIPRAYA • Student Feedback Management System</span>
           </div>
         </div>
 
@@ -56,7 +56,7 @@ export default function NotFound() {
           type="button" 
           className="simple-404-btn"
           onClick={() => {
-            document.title = "Maharaja Institute of Technology Mysore | Faculty & Course Feedback Portal";
+            document.title = "MITM ABHIPRAYA | Student Feedback & Course Appraisal Portal";
             navigate('/', { replace: true });
           }}
         >

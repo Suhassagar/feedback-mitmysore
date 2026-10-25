@@ -62,8 +62,8 @@ export const exportDepartmentConsolidatedExcel = ({
   // Sheet 1: Department Overview (Cleaned: No active sessions)
   const overviewData = [
     ["MAHARAJA INSTITUTE OF TECHNOLOGY MYSORE"],
+    ["MITM ABHIPRAYA - CONSOLIDATED ACADEMIC FEEDBACK AUDIT REPORT"],
     [`DEPARTMENT OF ${(deptName || dept_id).toUpperCase()}`],
-    ["CONSOLIDATED ACADEMIC FEEDBACK AUDIT REPORT"],
     ["Academic Year", academicYear],
     ["Generated On", timestamp],
     [],
