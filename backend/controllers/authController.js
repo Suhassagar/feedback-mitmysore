@@ -106,7 +106,7 @@ const facultyLogin = async (req, res) => {
     }
 
     if (faculty.is_active === 0) {
-      await logActivity(req, faculty.dept_id, 'BLOCKED_LOGIN', 'SECURITY', `Disabled faculty account (${searchInput}) attempted login`, 'WARNING');
+      await logActivity(req, 'SECURITY', 'BLOCKED_LOGIN', 'SECURITY', `Disabled faculty account (${searchInput}) attempted login`, 'WARNING');
       return res.json({ success: false, message: "Account disabled by Admin" });
     }
 
@@ -127,7 +127,7 @@ const facultyLogin = async (req, res) => {
         req.session.name = faculty.name;
         req.session.must_change_password = isDefaultPwd;
 
-        await logActivity(req, deptIdUpper, 'LOGIN', 'AUTH', `Faculty member ${faculty.name} (${faculty.faculty_id}) logged in`, 'SUCCESS');
+        // Note: Faculty login events are not recorded or saved in department logs
         return res.json({ 
           success: true, 
           message: "Login successful", 
@@ -142,7 +142,7 @@ const facultyLogin = async (req, res) => {
       });
     }
 
-    await logActivity(req, faculty.dept_id || 'FACULTY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for: ${searchInput}`, 'FAILED');
+    await logActivity(req, 'SECURITY', 'FAILED_LOGIN', 'SECURITY', `Failed faculty login attempt for: ${searchInput}`, 'FAILED');
     res.json({ success: false, message: "Invalid email/ID or password" });
   } catch (err) {
     console.error("Faculty Login Error:", err);
@@ -180,25 +180,25 @@ const studentLogin = async (req, res) => {
     
     const students = await db('global_students').where({ usn, dept_id }).limit(1);
     if (students.length === 0) {
-      await logSecurityAlert(req, dept_id || 'SECURITY', 'FAILED_LOGIN', `Student login failed: USN ${usn} not found in department ${dept_id}`, 'FAILED');
+      await logSecurityAlert(req, 'SECURITY', 'FAILED_LOGIN', `Student login failed: USN ${usn} not found in department ${dept_id}`, 'FAILED');
       return res.status(404).json({ message: "Student USN not found in department" });
     }
     
     const depts = await db('department').where({ dept_id }).select('is_active').limit(1);
     if (depts.length > 0 && depts[0].is_active === 0) {
-      await logSecurityAlert(req, dept_id, 'SUSPENDED_DEPT_ACCESS', `Student login attempt for suspended department ${dept_id} by USN ${usn}`, 'FAILED');
+      await logSecurityAlert(req, 'SECURITY', 'SUSPENDED_DEPT_ACCESS', `Student login attempt for suspended department ${dept_id} by USN ${usn}`, 'FAILED');
       return res.status(403).json({ message: "Your department account has been suspended by the Admin." });
     }
     
     const sessions = await db('global_sessions').where({ session_id, dept_id }).limit(1);
     if (sessions.length === 0) {
-      await logSecurityAlert(req, dept_id, 'FAILED_LOGIN', `Student login failed: Session ${session_id} not found for department ${dept_id}`, 'FAILED');
+      await logSecurityAlert(req, 'SECURITY', 'FAILED_LOGIN', `Student login failed: Session ${session_id} not found for department ${dept_id}`, 'FAILED');
       return res.status(404).json({ message: "Session not found" });
     }
     
     const session = sessions[0];
     if (session.status !== 'active') {
-      await logSecurityAlert(req, dept_id, 'INACTIVE_SESSION_ACCESS', `Student login attempt to inactive session ${session_id} by USN ${usn}`, 'FAILED');
+      await logSecurityAlert(req, 'SECURITY', 'INACTIVE_SESSION_ACCESS', `Student login attempt to inactive session ${session_id} by USN ${usn}`, 'FAILED');
       return res.status(403).json({ message: "This feedback session is not active" });
     }
 
@@ -209,7 +209,7 @@ const studentLogin = async (req, res) => {
     const sessionSec = String(session.section || '').trim().toUpperCase();
 
     if (studentSem !== sessionSem || studentSec !== sessionSec) {
-      await logSecurityAlert(req, dept_id, 'SECTION_MISMATCH_ACCESS', `Student ${usn} (Sem ${studentSem} Sec ${studentSec}) attempted access to session ${session_id} (Sem ${sessionSem} Sec ${sessionSec})`, 'FAILED');
+      await logSecurityAlert(req, 'SECURITY', 'SECTION_MISMATCH_ACCESS', `Student ${usn} (Sem ${studentSem} Sec ${studentSec}) attempted access to session ${session_id} (Sem ${sessionSem} Sec ${sessionSec})`, 'FAILED');
       return res.status(403).json({ 
         message: `Access denied. This session is for Sem ${session.sem} Sec ${session.section}, but you are registered in Sem ${students[0].sem} Sec ${students[0].section}.` 
       });
@@ -238,8 +238,7 @@ const studentLogin = async (req, res) => {
       req.session.sem = students[0].sem;
       req.session.section = students[0].section;
 
-      await logActivity(req, dept_id, 'LOGIN', 'STUDENT_AUTH', `Student ${usn} (${students[0].name}) logged in for session ${session_id} (Sem ${session.sem} Sec ${session.section})`, 'SUCCESS');
-      
+      // Note: Student login events are not recorded or saved in department logs
       return res.json({ 
         success: true, 
         message: "Login successful", 
@@ -254,11 +253,13 @@ const studentLogin = async (req, res) => {
 };
 
 const logout = async (req, res) => {
-  const actor = req.session?.dept_id || (req.session?.role === 'admin' ? 'ADMIN' : (req.session?.faculty_id ? `FACULTY-${req.session.faculty_id}` : null));
-  const roleName = req.session?.role ? req.session.role.toUpperCase() : 'USER';
+  const { role, dept_id, username } = req.session || {};
   
-  if (actor) {
-    await logActivity(req, actor, 'LOGOUT', 'AUTH', `${roleName} logged out of the system`, 'SUCCESS');
+  // Only record audit log for Admin and Department accounts (student and faculty logouts are not recorded)
+  if (role === 'admin') {
+    await logActivity(req, 'ADMIN', 'LOGOUT', 'AUTH', `System Administrator (${username || 'admin'}) logged out`, 'SUCCESS');
+  } else if (role === 'department' && dept_id) {
+    await logActivity(req, dept_id, 'LOGOUT', 'AUTH', `Department (${dept_id}) logged out of the system`, 'SUCCESS');
   }
 
   req.session.destroy(err => {
@@ -269,11 +270,12 @@ const logout = async (req, res) => {
 };
 
 const silentLogout = async (req, res) => {
-  const actor = req.session?.dept_id || (req.session?.role === 'admin' ? 'ADMIN' : (req.session?.faculty_id ? `FACULTY-${req.session.faculty_id}` : null));
-  const roleName = req.session?.role ? req.session.role.toUpperCase() : 'USER';
+  const { role, dept_id, username } = req.session || {};
   
-  if (actor) {
-    await logActivity(req, actor, 'LOGOUT', 'AUTH', `${roleName} logged out (Browser Tab Closed)`, 'SUCCESS');
+  if (role === 'admin') {
+    await logActivity(req, 'ADMIN', 'LOGOUT', 'AUTH', `System Administrator (${username || 'admin'}) logged out (Browser Tab Closed)`, 'SUCCESS');
+  } else if (role === 'department' && dept_id) {
+    await logActivity(req, dept_id, 'LOGOUT', 'AUTH', `Department (${dept_id}) logged out (Browser Tab Closed)`, 'SUCCESS');
   }
 
   req.session.destroy(err => {

@@ -143,10 +143,11 @@ async function runTests() {
     'authController.js must log security alert for section/sem mismatch attempt'
   );
   assert.ok(
-    authControllerSrc.includes('logActivity(req, dept_id, \'LOGIN\', \'STUDENT_AUTH\''),
-    'authController.js must record student login success in audit logs'
+    !authControllerSrc.includes("logActivity(req, dept_id, 'LOGIN', 'STUDENT_AUTH'") &&
+    !authControllerSrc.includes("logActivity(req, deptIdUpper, 'LOGIN', 'AUTH'"),
+    'authController.js must NOT record student login or faculty login in department logs'
   );
-  console.log('✅ Student authentication security and audit trail logging verified.');
+  console.log('✅ Student and faculty login events properly excluded from department activity logs.');
 
   console.log('\n🎉 ALL SECURITY LOGGING & MONITORING HARDENING TESTS PASSED SUCCESSFULLY! 🎉\n');
 }

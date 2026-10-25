@@ -276,7 +276,14 @@ const getDepartmentLogs = async (req, res) => {
 
   try {
     let query = db('global_department_activity_logs')
-      .whereRaw('UPPER(dept_id) = ?', [cleanDept]);
+      .whereRaw('UPPER(dept_id) = ?', [cleanDept])
+      .whereNotIn('entity', ['STUDENT_AUTH'])
+      .andWhere(builder => {
+        builder.whereNot('description', 'like', 'Student %')
+          .andWhereNot('description', 'like', '%Faculty member %')
+          .andWhereNot('description', 'like', 'STUDENT logged%')
+          .andWhereNot('description', 'like', 'FACULTY logged%');
+      });
 
     if (action && action !== 'ALL') {
       query = query.andWhereRaw('UPPER(action_type) = ?', [String(action).toUpperCase()]);

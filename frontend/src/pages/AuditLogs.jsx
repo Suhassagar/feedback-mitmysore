@@ -108,6 +108,18 @@ export default function AuditLogs() {
   // Client-side filtering for immediate snappy response
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
+      // Exclude student and faculty logins/logouts from department logs
+      const desc = (log.description || '').toLowerCase();
+      if (
+        log.entity === 'STUDENT_AUTH' || 
+        desc.startsWith('student ') || 
+        desc.includes('faculty member ') || 
+        desc.includes('student logged') || 
+        desc.includes('faculty logged')
+      ) {
+        return false;
+      }
+
       const matchesAction = selectedAction === "ALL" || 
         String(log.action_type).toUpperCase() === selectedAction.toUpperCase();
       
