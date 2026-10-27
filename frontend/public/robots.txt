@@ -13,5 +13,6 @@ Disallow: /admin/*
 Disallow: /audit-logs/
 Disallow: /department-settings/
 
-# Sitemap Index
+# Host & Sitemap Directives
+Host: https://mitm-abhipraya.vercel.app
 Sitemap: https://mitm-abhipraya.vercel.app/sitemap.xml
