@@ -1,47 +1,118 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+        http://www.google.com/schemas/sitemap-image/1.1
+        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
 
-  <!-- MITM ABHIPRAYA - Home / Central Portal -->
+  <!-- ================================================================== -->
+  <!-- MITM ABHIPRAYA (ಅಭಿಪ್ರಾಯ) - Central Institutional Feedback Portal -->
+  <!-- ================================================================== -->
   <url>
     <loc>https://mitm-abhipraya.vercel.app/</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-27T00:00:00+05:30</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://mitm-abhipraya.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="kn" href="https://mitm-abhipraya.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://mitm-abhipraya.vercel.app/" />
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/logo.jpeg</image:loc>
+      <image:title>Maharaja Institute of Technology Mysore - Institutional Seal</image:title>
+      <image:caption>Official Seal and Emblem of Maharaja Institute of Technology Mysore (MITM), Established 2007</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/bg.jpeg</image:loc>
+      <image:title>MITM Campus and Academic Evaluation Facility</image:title>
+      <image:caption>Maharaja Institute of Technology Mysore Campus &amp; Academic Center</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/sagar.jpeg</image:loc>
+      <image:title>MITM ABHIPRAYA SAGAR AI Copilot</image:title>
+      <image:caption>SAGAR AI Academic Sentiment &amp; Institutional Analytics Copilot</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
   </url>
 
-  <!-- Student Feedback Portal Login -->
+  <!-- ================================================================== -->
+  <!-- Student Course & Faculty Feedback Evaluation Portal Login        -->
+  <!-- ================================================================== -->
   <url>
     <loc>https://mitm-abhipraya.vercel.app/student-login</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-27T00:00:00+05:30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://mitm-abhipraya.vercel.app/student-login" />
+    <xhtml:link rel="alternate" hreflang="kn" href="https://mitm-abhipraya.vercel.app/student-login" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://mitm-abhipraya.vercel.app/student-login" />
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/logo.jpeg</image:loc>
+      <image:title>MITM Student Feedback Portal Login</image:title>
+      <image:caption>Secure and Anonymous Student Academic Appraisal Portal Login</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
   </url>
 
-  <!-- Faculty Performance Portal Login -->
+  <!-- ================================================================== -->
+  <!-- Faculty Performance & Academic Appraisal Center Login            -->
+  <!-- ================================================================== -->
   <url>
     <loc>https://mitm-abhipraya.vercel.app/faculty-login</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-27T00:00:00+05:30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://mitm-abhipraya.vercel.app/faculty-login" />
+    <xhtml:link rel="alternate" hreflang="kn" href="https://mitm-abhipraya.vercel.app/faculty-login" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://mitm-abhipraya.vercel.app/faculty-login" />
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/logo.jpeg</image:loc>
+      <image:title>MITM Faculty Appraisal Login</image:title>
+      <image:caption>Faculty Performance Metrics &amp; Evaluation Portal</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
   </url>
 
-  <!-- Department HOD Portal Login -->
+  <!-- ================================================================== -->
+  <!-- Department HOD Management Portal Login                           -->
+  <!-- ================================================================== -->
   <url>
     <loc>https://mitm-abhipraya.vercel.app/department-login</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-27T00:00:00+05:30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://mitm-abhipraya.vercel.app/department-login" />
+    <xhtml:link rel="alternate" hreflang="kn" href="https://mitm-abhipraya.vercel.app/department-login" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://mitm-abhipraya.vercel.app/department-login" />
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/logo.jpeg</image:loc>
+      <image:title>MITM Department HOD Management Portal</image:title>
+      <image:caption>Department Head Feedback Session Management &amp; Analytics</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
   </url>
 
-  <!-- Central Institution Administration Login -->
+  <!-- ================================================================== -->
+  <!-- Central Institution Administration Control Console Login         -->
+  <!-- ================================================================== -->
   <url>
     <loc>https://mitm-abhipraya.vercel.app/admin-login</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-27T00:00:00+05:30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://mitm-abhipraya.vercel.app/admin-login" />
+    <xhtml:link rel="alternate" hreflang="kn" href="https://mitm-abhipraya.vercel.app/admin-login" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://mitm-abhipraya.vercel.app/admin-login" />
+    <image:image>
+      <image:loc>https://mitm-abhipraya.vercel.app/logo.jpeg</image:loc>
+      <image:title>MITM Central Admin Console Login</image:title>
+      <image:caption>Principal &amp; Institutional Governance System Administration</image:caption>
+      <image:geo_location>Mysore, Karnataka, India</image:geo_location>
+    </image:image>
   </url>
 
 </urlset>
