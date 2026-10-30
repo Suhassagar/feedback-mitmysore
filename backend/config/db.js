@@ -106,6 +106,61 @@ db.schema.hasTable('global_department_activity_logs').then(exists => {
   }
 }).catch(e => console.error('Auto-migration warning (global_department_activity_logs):', e.message));
 
+// Self-healing: Ensure global_faculty_scorecards exists on boot
+db.schema.hasTable('global_faculty_scorecards').then(async exists => {
+  if (!exists) {
+    await db.schema.createTable('global_faculty_scorecards', table => {
+      table.string('dept_id', 50).notNullable();
+      table.string('faculty_id', 50).notNullable();
+      table.string('course_id', 50).notNullable();
+      table.string('session_id', 50).notNullable();
+      
+      table.integer('total_score_sum').notNullable().defaultTo(0);
+      table.integer('ratings_count').notNullable().defaultTo(0);
+      table.integer('genuine_count').notNullable().defaultTo(0);
+      
+      table.integer('excellent_count').notNullable().defaultTo(0);
+      table.integer('good_count').notNullable().defaultTo(0);
+      table.integer('average_count').notNullable().defaultTo(0);
+      table.integer('poor_count').notNullable().defaultTo(0);
+      
+      table.primary(['dept_id', 'faculty_id', 'course_id', 'session_id']);
+      table.index(['session_id', 'dept_id'], 'idx_scorecards_session_dept');
+      table.index(['faculty_id'], 'idx_scorecards_faculty');
+    });
+    console.log('✅ Created missing global_faculty_scorecards table in database');
+
+    try {
+      const feedbackExists = await db.schema.hasTable('global_student_feedback');
+      if (feedbackExists) {
+        await db.raw(`
+          INSERT IGNORE INTO global_faculty_scorecards (
+            dept_id, faculty_id, course_id, session_id, 
+            total_score_sum, ratings_count, genuine_count, 
+            excellent_count, good_count, average_count, poor_count
+          )
+          SELECT 
+            dept_id, 
+            faculty_id, 
+            course_id, 
+            session_id, 
+            SUM(CASE WHEN is_genuine = 1 THEN rating ELSE 0 END) as total_score_sum, 
+            COUNT(rating) as ratings_count, 
+            SUM(CASE WHEN is_genuine = 1 THEN 1 ELSE 0 END) as genuine_count, 
+            SUM(CASE WHEN is_genuine = 1 AND rating >= 4.5 THEN 1 ELSE 0 END) as excellent_count, 
+            SUM(CASE WHEN is_genuine = 1 AND rating >= 3.5 AND rating < 4.5 THEN 1 ELSE 0 END) as good_count, 
+            SUM(CASE WHEN is_genuine = 1 AND rating >= 2.5 AND rating < 3.5 THEN 1 ELSE 0 END) as average_count, 
+            SUM(CASE WHEN is_genuine = 1 AND rating < 2.5 THEN 1 ELSE 0 END) as poor_count
+          FROM global_student_feedback
+          GROUP BY dept_id, faculty_id, course_id, session_id
+        `);
+      }
+    } catch (backfillErr) {
+      console.warn('Scorecard backfill warning:', backfillErr.message);
+    }
+  }
+}).catch(e => console.error('Auto-migration warning (global_faculty_scorecards):', e.message));
+
 async function ensurePerformanceIndexes() {
   try {
     const feedbackExists = await db.schema.hasTable('global_student_feedback');

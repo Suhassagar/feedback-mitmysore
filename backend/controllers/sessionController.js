@@ -133,7 +133,7 @@ const getSessions = async (req, res) => {
     res.json(enriched);
   } catch (err) {
     console.error("Error loading sessions:", err);
-    res.status(500).json({ message: "DB error", error: err });
+    res.status(500).json({ message: "DB error", error: err.message });
   }
 };
 
