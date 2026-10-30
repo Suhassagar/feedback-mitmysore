@@ -14,12 +14,16 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
   const fileInputRef = useRef(null);
 
   const expectedColumns = type === "students" 
-    ? ["usn", "name", "section", "email"] // sem is optional
+    ? ["usn", "name", "section"] // email and sem are optional
     : type === "courses"
     ? ["course_code", "course_name", "sem"]
     : type === "questions"
     ? ["heading", "question"]
     : ["faculty_id", "name", "email"];
+
+  const previewColumns = type === "students"
+    ? ["usn", "name", "section", "email"]
+    : expectedColumns;
 
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files?.[0] || e.dataTransfer?.files?.[0];
@@ -68,7 +72,9 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
             if (newRow.section) newRow.section = String(newRow.section).trim().toUpperCase();
             if (newRow.sem) newRow.sem = parseInt(newRow.sem, 10);
             if (selectedSem) newRow.sem = parseInt(selectedSem, 10);
-            if (newRow.email) newRow.email = String(newRow.email).trim().toLowerCase();
+            newRow.email = (newRow.email && String(newRow.email).trim()) 
+              ? String(newRow.email).trim().toLowerCase() 
+              : null;
           }
           return newRow;
         });
@@ -130,15 +136,18 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
   };
 
   const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      type === "students" 
-        ? { usn: "1BM20CS001", name: "John Doe", section: "A", email: "johndoe@example.com" }
-        : type === "courses"
-        ? { course_code: "CS101", course_name: "Database Management", sem: 4 }
-        : type === "questions"
-        ? { heading: "Teaching Effectiveness", question: "Clarity of explanation from the faculty." }
-        : { faculty_id: "FAC001", name: "Dr. Smith", email: "smith@mit.gmail.com" }
-    ]);
+    const templateData = type === "students" 
+      ? [
+          { usn: "1BM20CS001", name: "John Doe", section: "A", email: "johndoe@example.com" },
+          { usn: "1BM20CS002", name: "Jane Smith", section: "A", email: "" }
+        ]
+      : type === "courses"
+      ? [{ course_code: "CS101", course_name: "Database Management", sem: 4 }]
+      : type === "questions"
+      ? [{ heading: "Teaching Effectiveness", question: "Clarity of explanation from the faculty." }]
+      : [{ faculty_id: "FAC001", name: "Dr. Smith", email: "smith@mit.gmail.com" }];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, `${type}_import_template.xlsx`);
@@ -223,9 +232,9 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                 <thead style={{ background: "var(--bg-main)", position: "sticky", top: 0 }}>
                   <tr>
-                    {expectedColumns.map(col => (
+                    {previewColumns.map(col => (
                       <th key={col} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)", color: "var(--text-secondary)", fontWeight: "600", textTransform: "uppercase" }}>
-                        {col}
+                        {col}{type === "students" && col === "email" ? " (optional)" : ""}
                       </th>
                     ))}
                   </tr>
@@ -233,11 +242,21 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
                 <tbody>
                   {data.slice(0, 10).map((row, idx) => (
                     <tr key={idx} style={{ borderBottom: "1px solid var(--border-color)" }}>
-                      {expectedColumns.map(col => (
-                        <td key={col} style={{ padding: "12px 16px", color: "var(--text-primary)" }}>
-                          {row[col] || <span style={{ color: "red" }}>Missing</span>}
-                        </td>
-                      ))}
+                      {previewColumns.map(col => {
+                        const val = row[col];
+                        const isOptional = (type === "students" && col === "email") || (type === "students" && col === "sem");
+                        return (
+                          <td key={col} style={{ padding: "12px 16px", color: "var(--text-primary)" }}>
+                            {val !== undefined && val !== null && val !== "" ? (
+                              val
+                            ) : isOptional ? (
+                              <span style={{ color: "var(--text-secondary)", fontStyle: "italic", opacity: 0.6 }}>—</span>
+                            ) : (
+                              <span style={{ color: "red" }}>Missing</span>
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

@@ -289,7 +289,7 @@ const bulkUploadStudents = async (req, res) => {
       const cleanName = String(s.name).trim();
       const cleanSem = parseInt(s.sem, 10);
       const cleanSection = String(s.section || '').trim().toUpperCase();
-      const cleanEmail = s.email ? String(s.email).trim().toLowerCase() : null;
+      const cleanEmail = (s.email && String(s.email).trim()) ? String(s.email).trim().toLowerCase() : null;
 
       // Check if an active session exists for this department, semester, and section
       const activeSession = await trx('global_sessions')
