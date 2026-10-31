@@ -174,6 +174,11 @@ const sessionStore = new MySQLStore({
   }
 }, sessionPool);
 
+// Prevent unhandled EventEmitter crashes during transient DB dropouts
+sessionStore.on('error', (error) => {
+  console.error('❌ [SessionStore Error]:', error.message);
+});
+
 const sessionMiddleware = session({
   key: 'connect.sid',
   secret: env.SESSION_SECRET,
@@ -307,7 +312,12 @@ if (require.main === module) {
 
       setInterval(() => {
         httpLib.get(`${targetUrl}/ping`, (res) => {
-          console.log(`[Keep-Alive] Self-ping to ${targetUrl}/ping succeeded (status: ${res.statusCode})`);
+          res.resume(); // Consume and discard data stream to free socket memory
+          if (res.statusCode === 200) {
+            console.log(`[Keep-Alive] Self-ping to ${targetUrl}/ping succeeded (status: 200)`);
+          } else {
+            console.warn(`[Keep-Alive] Self-ping warning: non-200 status (${res.statusCode})`);
+          }
         }).on("error", (err) => {
           console.warn(`[Keep-Alive] Self-ping warning: ${err.message}`);
         });

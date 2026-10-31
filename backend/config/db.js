@@ -46,6 +46,17 @@ const dbOptions = {
 const db = knex(dbOptions);
 
 // Self-healing: Ensure required tables exist on boot
+db.schema.hasTable('express_sessions').then(exists => {
+  if (!exists) {
+    return db.schema.createTable('express_sessions', table => {
+      table.string('session_id', 128).primary();
+      table.integer('expires', 11).unsigned().notNullable();
+      table.text('data', 'mediumtext').nullable();
+      table.index(['expires'], 'idx_express_sessions_expires');
+    }).then(() => console.log('✅ Created missing express_sessions table in database'));
+  }
+}).catch(e => console.error('Auto-migration warning (express_sessions):', e.message));
+
 db.schema.hasTable('global_used_tokens').then(exists => {
   if (!exists) {
     return db.schema.createTable('global_used_tokens', table => {
