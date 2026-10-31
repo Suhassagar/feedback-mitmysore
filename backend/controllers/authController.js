@@ -38,7 +38,16 @@ const departmentLogin = async (req, res) => {
   let { username, password } = req.body;
   if (username) username = username.trim().toLowerCase();
   
-  const deptRows = await db('department').where({ username }).limit(1);
+  const deptRows = await db('department')
+    .where({ username })
+    .orWhere((builder) => {
+      if (username === 'cse_hod' || username === 'cse@mit' || username === 'cse') {
+        builder.where({ dept_id: 'CSE' });
+      } else if (username === 'ece_hod' || username === 'ece@mit' || username === 'ece') {
+        builder.where({ dept_id: 'ECE' });
+      }
+    })
+    .limit(1);
   
   if (deptRows.length > 0) {
     if (deptRows[0].is_active === 0) {
@@ -237,6 +246,7 @@ const studentLogin = async (req, res) => {
       req.session.name = students[0].name;
       req.session.sem = students[0].sem;
       req.session.section = students[0].section;
+      req.session.feedback_start_time = Date.now();
 
       // Note: Student login events are not recorded or saved in department logs
       return res.json({ 
