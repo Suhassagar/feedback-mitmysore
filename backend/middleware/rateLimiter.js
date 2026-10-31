@@ -66,11 +66,76 @@ const feedbackSubmissionLimiter = rateLimit({
   handler: createRateLimitHandler({ error: "Too many feedback submissions, please try again later." }, "Excessive student feedback submission attempts")
 });
 
+// 7. Privileged Administrative Login Limiter (Admin, Department, Faculty)
+// Strict password brute-force defense (5 attempts per 15 min per IP in production)
+const privilegedLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 5 : 100,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: createRateLimitHandler(
+    { success: false, message: "Too many login attempts from this IP, please try again after 15 minutes." },
+    "Excessive privileged account login attempts from IP"
+  )
+});
+
+// 8. Campus Lab NAT Gateway Surge Limiter (DDoS / Gateway Flooding Shield)
+// Up to 1,200 total login attempts per 15 min per IP to permit 10+ concurrent college computer labs
+const labSurgeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 1200 : 3000,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: createRateLimitHandler(
+    {
+      success: false,
+      message: "Campus network login limit exceeded. Please wait 2 minutes before signing in."
+    },
+    "Campus lab NAT gateway surge limit exceeded"
+  )
+});
+
+// 9. Identity-Aware Student Login Limiter (Per-USN Account Protection)
+// Keyed strictly by normalized USN; successful logins consume 0 quota
+const studentLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: (req) => {
+    const rawUsn = req.body?.usn;
+    if (rawUsn && typeof rawUsn === 'string' && rawUsn.trim().length >= 3) {
+      return 10; // Max 10 failed login attempts per unique USN
+    }
+    return 20; // Max 20 attempts for empty/malformed USN probes per IP
+  },
+  keyGenerator: (req) => {
+    const rawUsn = req.body?.usn;
+    if (rawUsn && typeof rawUsn === 'string' && rawUsn.trim().length >= 3) {
+      const cleanUsn = rawUsn.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return `student_auth:${cleanUsn}`;
+    }
+    return `student_anon:${ipKeyGenerator(req.ip)}`;
+  },
+  skipSuccessfulRequests: true, // Legitimate successful logins do not decrement the budget
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: createRateLimitHandler(
+    { 
+      success: false, 
+      message: "Too many failed login attempts for this student ID. Please double-check your USN or wait 15 minutes." 
+    }, 
+    "Excessive student login attempts for specific USN"
+  )
+});
+
 module.exports = {
   apiLimiter,
   sensitiveLimiter,
   emailHealthLimiter,
   registrationLimiter,
   profileUploadLimiter,
-  feedbackSubmissionLimiter
+  feedbackSubmissionLimiter,
+  privilegedLoginLimiter,
+  labSurgeLimiter,
+  studentLoginLimiter
 };
