@@ -17,9 +17,16 @@ class SubmissionQueue {
   constructor(options = {}) {
     this.batchSize = options.batchSize || 50;
     this.flushIntervalMs = options.flushIntervalMs || 500;
+    this.maxRetries = options.maxRetries || 3;
+    this.retryBackoffMs = options.retryBackoffMs || 1000;
     this.queue = [];
     this.isFlushing = false;
     this.timer = null;
+
+    // Telemetry & Audit Counters
+    this.totalProcessed = 0;
+    this.totalRetried = 0;
+    this.totalDeadLettered = 0;
 
     this.start();
   }
@@ -164,6 +171,7 @@ class SubmissionQueue {
         }
 
         await trx.commit();
+        this.totalProcessed += count;
 
         console.log(`🚀 [SubmissionQueue] Flushed batch of ${count} submissions (${allRatings.length} ratings, ${consolidatedScorecards.length} consolidated scorecard updates)`);
 
@@ -189,6 +197,33 @@ class SubmissionQueue {
 
     } catch (batchErr) {
       console.error(`❌ [SubmissionQueue Batch Error] Failed to persist ${count} items:`, batchErr.message);
+
+      // Automatic Batch Retry with Circuit Breaker
+      const recoverable = [];
+      const deadLetter = [];
+
+      for (const item of batch) {
+        item._retryCount = (item._retryCount || 0) + 1;
+        if (item._retryCount <= this.maxRetries) {
+          recoverable.push(item);
+        } else {
+          deadLetter.push(item);
+        }
+      }
+
+      if (deadLetter.length > 0) {
+        this.totalDeadLettered += deadLetter.length;
+        console.error(`🚨 [SubmissionQueue Dead-Letter Alert] ${deadLetter.length} items exceeded max retries (${this.maxRetries}) and were discarded.`);
+      }
+
+      if (recoverable.length > 0) {
+        this.totalRetried += recoverable.length;
+        console.warn(`🔄 [SubmissionQueue Retry] Re-inserting ${recoverable.length} items back to front of queue (attempt ${recoverable[0]._retryCount}/${this.maxRetries}).`);
+        this.queue.unshift(...recoverable);
+        
+        // Brief backoff pause before allowing next flush
+        await new Promise(r => setTimeout(r, Math.min(this.retryBackoffMs * recoverable[0]._retryCount, 5000)));
+      }
     } finally {
       this.isFlushing = false;
       // If items accumulated while flushing, schedule immediate flush
@@ -199,6 +234,48 @@ class SubmissionQueue {
 
     return count;
   }
+
+  /**
+   * Graceful Drain: Flushes all buffered submissions to TiDB until queue is empty
+   * @param {number} [timeoutMs=8000] Maximum milliseconds to wait before resolving
+   * @returns {Promise<number>} Number of submissions flushed during drain
+   */
+  async drain(timeoutMs = 8000) {
+    this.stop(); // Stop recurring timer to prevent race conditions
+    const startTime = Date.now();
+    const initialCount = this.queue.length;
+
+    while (this.queue.length > 0 || this.isFlushing) {
+      if (Date.now() - startTime > timeoutMs) {
+        console.error(`⚠️ [SubmissionQueue Drain Timeout] Could not drain all items within ${timeoutMs}ms. Remaining in queue: ${this.queue.length}`);
+        break;
+      }
+
+      if (!this.isFlushing && this.queue.length > 0) {
+        try {
+          await this.flush();
+        } catch (err) {
+          console.error("Error during queue drain flush:", err.message);
+        }
+      } else {
+        // Wait 50ms for in-flight flush to finish
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    return initialCount - this.queue.length;
+  }
+
+  getStatus() {
+    return {
+      queueLength: this.queue.length,
+      isFlushing: this.isFlushing,
+      totalProcessed: this.totalProcessed,
+      totalRetried: this.totalRetried,
+      totalDeadLettered: this.totalDeadLettered
+    };
+  }
+
 
   processEmbeddingsAsync(facultyRemarks, sectionRemarks, deptRemarks) {
     setTimeout(async () => {

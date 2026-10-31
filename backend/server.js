@@ -320,12 +320,25 @@ if (require.main === module) {
 
 // --- Process Lifecycle & Graceful Shutdown ---
 const db = require("./config/db");
+const submissionQueue = require("./services/submissionQueue");
 
 const gracefulShutdown = (signal) => {
   console.log(`[SYSTEM] Received ${signal}. Initiating graceful shutdown...`);
   server.close(async () => {
     console.log('[SYSTEM] HTTP and WebSocket listeners closed.');
     try {
+      // 1. Drain any in-memory queued submissions to TiDB before cutting connection pools
+      if (submissionQueue && submissionQueue.getQueueLength() > 0) {
+        console.log(`[SYSTEM] Draining ${submissionQueue.getQueueLength()} pending submissions to database...`);
+        const drained = await submissionQueue.drain(6000);
+        console.log(`[SYSTEM] Successfully drained ${drained} queued submissions.`);
+      }
+      if (submissionQueue) {
+        submissionQueue.stop();
+        console.log('[SYSTEM] Submission queue timer stopped.');
+      }
+
+      // 2. Only after queue is drained, safely close database connection pools
       if (sessionPool && typeof sessionPool.end === 'function') {
         await sessionPool.end();
         console.log('[SYSTEM] Session database connection pool drained.');
@@ -348,8 +361,11 @@ const gracefulShutdown = (signal) => {
   }, 10000).unref();
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
 
 process.on('unhandledRejection', (reason) => {
   console.error('[CRITICAL] Unhandled Promise Rejection:', reason);
