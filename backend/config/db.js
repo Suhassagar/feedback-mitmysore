@@ -163,6 +163,17 @@ db.schema.hasTable('global_faculty_scorecards').then(async exists => {
   }
 }).catch(e => console.error('Auto-migration warning (global_faculty_scorecards):', e.message));
 
+const safeAddIndex = async (tableName, indexName, columnsSql) => {
+  try {
+    await db.raw(`ALTER TABLE ${tableName} ADD INDEX ${indexName} (${columnsSql})`);
+    console.log(`✅ [Database Index] Added index ${indexName} on ${tableName}(${columnsSql})`);
+  } catch (err) {
+    if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
+      console.warn(`[Database Index] Notice on ${indexName}:`, err.message);
+    }
+  }
+};
+
 async function ensurePerformanceIndexes() {
   try {
     const feedbackExists = await db.schema.hasTable('global_student_feedback');
@@ -173,25 +184,34 @@ async function ensurePerformanceIndexes() {
           console.log('✅ Added missing is_genuine column for variance shadowbanning');
         }
       });
-      await db.raw('ALTER TABLE global_student_feedback ADD INDEX idx_feedback_session_dept (session_id, dept_id)').catch(err => {
-        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
-          // Ignored if index already exists
-        }
-      });
-      await db.raw('ALTER TABLE global_student_feedback ADD INDEX idx_feedback_faculty_course (faculty_id, course_id, dept_id)').catch(err => {
-        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
-          // Ignored if index already exists
-        }
-      });
+      // Composite covering indexes for session reports, averages, and trend analytics
+      await safeAddIndex('global_student_feedback', 'idx_feedback_session_dept', 'session_id, dept_id');
+      await safeAddIndex('global_student_feedback', 'idx_feedback_faculty_course', 'faculty_id, course_id, dept_id');
+      await safeAddIndex('global_student_feedback', 'idx_feedback_session_fac_genuine', 'session_id, faculty_id, is_genuine, rating');
+      await safeAddIndex('global_student_feedback', 'idx_feedback_dept_genuine_rating', 'dept_id, is_genuine, rating');
+      await safeAddIndex('global_student_feedback', 'idx_feedback_session_question', 'session_id, is_genuine, question_id, rating');
+      await safeAddIndex('global_student_feedback', 'idx_feedback_dept_created', 'dept_id, is_genuine, created_at');
     }
 
     const studentsExists = await db.schema.hasTable('global_students');
     if (studentsExists) {
-      await db.raw('ALTER TABLE global_students ADD INDEX idx_students_dept_sem_sec (dept_id, sem, section)').catch(err => {
-        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
-          // Ignored if index already exists
-        }
-      });
+      // Rapid turnout, attendance, and section filtering indexes
+      await safeAddIndex('global_students', 'idx_students_dept_sem_sec', 'dept_id, sem, section');
+      await safeAddIndex('global_students', 'idx_students_session_feedback', 'session_id, feedback_given');
+      await safeAddIndex('global_students', 'idx_students_dept_feedback', 'dept_id, feedback_given');
+    }
+
+    const sessionsExists = await db.schema.hasTable('global_sessions');
+    if (sessionsExists) {
+      // Instant coordinator sorting and active session guards
+      await safeAddIndex('global_sessions', 'idx_sessions_dept_status_created', 'dept_id, status, created_at');
+      await safeAddIndex('global_sessions', 'idx_sessions_active_lookup', 'dept_id, sem, section, status');
+    }
+
+    const scorecardsExists = await db.schema.hasTable('global_faculty_scorecards');
+    if (scorecardsExists) {
+      // Fast department scorecard summaries
+      await safeAddIndex('global_faculty_scorecards', 'idx_scorecards_dept_session', 'dept_id, session_id');
     }
 
     const logsExists = await db.schema.hasTable('global_department_activity_logs');
@@ -202,11 +222,7 @@ async function ensurePerformanceIndexes() {
           console.log('✅ Added missing status column to global_department_activity_logs');
         }
       });
-      await db.raw('ALTER TABLE global_department_activity_logs ADD INDEX idx_activity_dept_created (dept_id, created_at)').catch(err => {
-        if (!err.message?.includes('Duplicate key name') && err.code !== 'ER_DUP_KEYNAME') {
-          // Ignored if index already exists
-        }
-      });
+      await safeAddIndex('global_department_activity_logs', 'idx_activity_dept_created', 'dept_id, created_at');
     }
 
     const deptExists = await db.schema.hasTable('department');
@@ -245,4 +261,5 @@ async function ensurePerformanceIndexes() {
 }
 ensurePerformanceIndexes();
 
+db.ensurePerformanceIndexes = ensurePerformanceIndexes;
 module.exports = db;
