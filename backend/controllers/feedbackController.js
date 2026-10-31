@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
 const cacheService = require('../services/cacheService');
+const submissionQueue = require('../services/submissionQueue');
 const crypto = require('crypto');
 
 //=========================================================
@@ -234,67 +235,20 @@ const submitFeedback = async (req, res) => {
       res.json({ message: "Feedback submitted successfully" });
     }
 
-    // 5. ASYNCHRONOUS HEAVY INGESTION QUEUE WORKER
-    setTimeout(async () => {
-      const trx = await db.transaction();
-      try {
-        if (ratingsToInsert.length > 0) await trx.batchInsert('global_student_feedback', ratingsToInsert, 100);
-        if (facultyRemarksToInsert.length > 0) await trx('global_faculty_remarks').insert(facultyRemarksToInsert);
-        if (sectionRemarksToInsert.length > 0) await trx('global_section_remarks').insert(sectionRemarksToInsert);
+    // 5. ASYNCHRONOUS MICRO-BATCH QUEUE WORKER
+    // Pushes into in-memory queue to consolidate database transactions across 500+ concurrent students
+    submissionQueue.enqueue({
+      dept_id,
+      session_id: verifiedSessionId,
+      ratingsToInsert,
+      facultyRemarksToInsert,
+      sectionRemarksToInsert,
+      scorecardUpdatesToInsert,
+      department_remark,
+      io: req.app?.get('io')
+    });
 
-        for (const score of scorecardUpdatesToInsert) {
-          await trx.raw(`
-            INSERT INTO global_faculty_scorecards (
-              dept_id, faculty_id, course_id, session_id, total_score_sum, ratings_count, genuine_count, excellent_count, good_count, average_count, poor_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-              total_score_sum = total_score_sum + VALUES(total_score_sum),
-              ratings_count = ratings_count + VALUES(ratings_count),
-              genuine_count = genuine_count + VALUES(genuine_count),
-              excellent_count = excellent_count + VALUES(excellent_count),
-              good_count = good_count + VALUES(good_count),
-              average_count = average_count + VALUES(average_count),
-              poor_count = poor_count + VALUES(poor_count)
-          `, [score.dept_id, score.faculty_id, score.course_id, score.session_id, score.sum, score.count, score.genuineCount, score.excellent, score.good, score.average, score.poor]);
-        }
-
-        if (department_remark && department_remark.trim() !== "") {
-          await trx('global_session_remarks').insert({
-            session_id, remark_text: department_remark.trim(), dept_id
-          });
-        }
-
-        await trx.commit();
-        
-        // Notify realtime dashboards
-        const io = req.app.get('io');
-        if (io) io.emit("NEW_FEEDBACK_RECEIVED", { dept_id, session_id });
-
-        await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${session_id} (${ratingsToInsert.length} ratings processed)`, 'SUCCESS');
-
-        // Phase 6: Vector Embeddings
-        const { generateEmbedding } = require('../utils/embedder');
-        for (const r of facultyRemarksToInsert) {
-          const vector = await generateEmbedding(r.remark_text);
-          if (vector) await db('global_faculty_remarks').where({ session_id: r.session_id, faculty_id: r.faculty_id, course_id: r.course_id, remark_text: r.remark_text }).update({ embedding: JSON.stringify(vector) });
-        }
-        for (const r of sectionRemarksToInsert) {
-          const vector = await generateEmbedding(r.remark_text);
-          if (vector) await db('global_section_remarks').where({ session_id: r.session_id, faculty_id: r.faculty_id, course_id: r.course_id, section_heading: r.section_heading, remark_text: r.remark_text }).update({ embedding: JSON.stringify(vector) });
-        }
-        if (department_remark && department_remark.trim() !== "") {
-          const vector = await generateEmbedding(department_remark);
-          if (vector) await db('global_session_remarks').where({ session_id, dept_id, remark_text: department_remark.trim() }).update({ embedding: JSON.stringify(vector) });
-        }
-
-      } catch (ingestErr) {
-        if (trx && !trx.isCompleted()) await trx.rollback();
-        console.error("Background Ingestion Error:", ingestErr);
-        // Fail-safe: Revert student status so they can try again
-        await db('global_students').where({ usn: student.usn, dept_id, session_id }).update({ session_id: null, feedback_given: 'pending' });
-        await db('global_used_tokens').where({ token: idempotency_key }).del().catch(()=>{});
-      }
-    }, 0);
+    await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${verifiedSessionId} (${ratingsToInsert.length} ratings queued)`, 'SUCCESS');
 
   } catch (err) {
     console.error("Error staging feedback:", err);

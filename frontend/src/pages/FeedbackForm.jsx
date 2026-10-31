@@ -10,7 +10,10 @@ import {
   Clock, 
   ShieldCheck, 
   BookOpen,
-  MessageSquare
+  MessageSquare,
+  Lock,
+  EyeOff,
+  UserCheck
 } from "lucide-react";
 import PageTransition from "../components/PageTransition";
 import { jumbleQuestionsForStudent } from "../utils/shuffleUtils";
@@ -81,10 +84,57 @@ export default function FeedbackForm() {
   const [questions, setQuestions] = useState([]);
   const [groupedQuestions, setGroupedQuestions] = useState({});
   const [orderedSections, setOrderedSections] = useState([]);
-  const [feedbackData, setFeedbackData] = useState({});
-  const [facultyRemarks, setFacultyRemarks] = useState({});
-  const [sectionRemarks, setSectionRemarks] = useState({});
-  const [departmentRemark, setDepartmentRemark] = useState("");
+  
+  const draftKey = session_id ? `feedback_draft_${session_id}` : null;
+
+  const [feedbackData, setFeedbackData] = useState(() => {
+    try {
+      if (draftKey) {
+        const saved = sessionStorage.getItem(draftKey);
+        if (saved) return JSON.parse(saved).feedbackData || {};
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    return {};
+  });
+
+  const [facultyRemarks, setFacultyRemarks] = useState(() => {
+    try {
+      if (draftKey) {
+        const saved = sessionStorage.getItem(draftKey);
+        if (saved) return JSON.parse(saved).facultyRemarks || {};
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    return {};
+  });
+
+  const [sectionRemarks, setSectionRemarks] = useState(() => {
+    try {
+      if (draftKey) {
+        const saved = sessionStorage.getItem(draftKey);
+        if (saved) return JSON.parse(saved).sectionRemarks || {};
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    return {};
+  });
+
+  const [departmentRemark, setDepartmentRemark] = useState(() => {
+    try {
+      if (draftKey) {
+        const saved = sessionStorage.getItem(draftKey);
+        if (saved) return JSON.parse(saved).departmentRemark || "";
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    return "";
+  });
+
   const [idempotencyKey, setIdempotencyKey] = useState(null);
   
   // Dynamic timer state (configured by department, default 300)
@@ -105,9 +155,46 @@ export default function FeedbackForm() {
   });
   
   // Wizard step (0 to facultyList.length)
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(() => {
+    try {
+      if (draftKey) {
+        const saved = sessionStorage.getItem(draftKey);
+        if (saved) return JSON.parse(saved).currentStep || 0;
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    return 0;
+  });
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-sync draft to sessionStorage to protect against accidental tab reload or phone lock
+  useEffect(() => {
+    if (draftKey && (Object.keys(feedbackData).length > 0 || departmentRemark || currentStep > 0)) {
+      try {
+        sessionStorage.setItem(draftKey, JSON.stringify({
+          feedbackData,
+          facultyRemarks,
+          sectionRemarks,
+          departmentRemark,
+          currentStep
+        }));
+      } catch (e) {
+        console.warn("Draft auto-sync warning:", e);
+      }
+    }
+  }, [draftKey, feedbackData, facultyRemarks, sectionRemarks, departmentRemark, currentStep]);
+
+  // Professional Anonymity & Privacy Guarantee Modal State
+  const [showAnonymityModal, setShowAnonymityModal] = useState(() => {
+    return !sessionStorage.getItem('feedback_anonymity_acknowledged');
+  });
+
+  const handleAcknowledgeAnonymity = () => {
+    sessionStorage.setItem('feedback_anonymity_acknowledged', 'true');
+    setShowAnonymityModal(false);
+  };
 
   useEffect(() => {
     if (!session_id) {
@@ -274,30 +361,60 @@ export default function FeedbackForm() {
 
   const executeSubmit = async () => {
     setIsSubmitting(true);
-    try {
-      const feedbackPayload = facultyList.map((faculty, fIndex) => ({
-        faculty_id: faculty.faculty_id,
-        course_id: faculty.course_id,
-        feedback: feedbackData[fIndex],
-        remark: facultyRemarks[fIndex] || "",
-        section_remarks: sectionRemarks[fIndex] || {},
-      }));
+    const feedbackPayload = facultyList.map((faculty, fIndex) => ({
+      faculty_id: faculty.faculty_id,
+      course_id: faculty.course_id,
+      feedback: feedbackData[fIndex],
+      remark: facultyRemarks[fIndex] || "",
+      section_remarks: sectionRemarks[fIndex] || {},
+    }));
 
-      await apiClient.post(
-        "/submit-feedback",
-        {
-          session_id,
-          facultyList: feedbackPayload,
-          department_remark: departmentRemark,
-          idempotency_key: idempotencyKey
-        },
-        { withCredentials: true }
-      );
+    const maxAttempts = 3;
+    let attempt = 0;
+    let success = false;
+    let lastError = null;
 
+    while (attempt < maxAttempts && !success) {
+      attempt++;
+      try {
+        if (attempt > 1) {
+          toast.loading(`Network interrupted. Retrying submission (Attempt ${attempt}/${maxAttempts})...`, { id: 'retry-toast' });
+        }
+
+        await apiClient.post(
+          "/submit-feedback",
+          {
+            session_id,
+            facultyList: feedbackPayload,
+            department_remark: departmentRemark,
+            idempotency_key: idempotencyKey
+          },
+          { withCredentials: true, timeout: 15000 }
+        );
+
+        success = true;
+        toast.dismiss('retry-toast');
+      } catch (err) {
+        lastError = err;
+        // If client error (bad request, duplicate token, dwell timer, unauthorized), do not retry
+        if (err.response?.status === 403 || err.response?.status === 400 || err.response?.status === 401) {
+          break;
+        }
+        // If network disconnect or server 5xx, wait and retry with exponential backoff
+        if (attempt < maxAttempts) {
+          const backoffDelay = attempt * 1500;
+          await new Promise(res => setTimeout(res, backoffDelay));
+        }
+      }
+    }
+
+    if (success) {
+      if (draftKey) sessionStorage.removeItem(draftKey);
       sessionStorage.removeItem('active_feedback_session_id');
       sessionStorage.removeItem('student_usn');
       sessionStorage.removeItem('feedback_student_seed');
       sessionStorage.removeItem('feedback_start_time_local');
+      sessionStorage.removeItem('feedback_anonymity_acknowledged');
       try {
         await apiClient.post('/auth/logout');
       } catch {
@@ -307,13 +424,12 @@ export default function FeedbackForm() {
       toast.success("Feedback submitted successfully.");
       setShowSubmitModal(false);
       navigate("/");
-
-    } catch (err) {
-      console.error(err.response?.data);
-      toast.error(err.response?.data?.error || "Submission failed. Please check network connection.");
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      toast.dismiss('retry-toast');
+      console.error("Submission failed after attempts:", lastError?.response?.data || lastError?.message);
+      toast.error(lastError?.response?.data?.error || "Submission failed due to weak network. Your answers are saved as draft! Please check your connection and tap Submit again.", { duration: 6000 });
     }
+    setIsSubmitting(false);
   };
 
   if (loading) {
@@ -356,6 +472,76 @@ export default function FeedbackForm() {
   return (
     <PageTransition>
       <div className="theme-student eval-page-container">
+        {/* ============================================================ */}
+        {/* ANONYMITY & PRIVACY PLEDGE MODAL (ON FIRST LOGIN)            */}
+        {/* ============================================================ */}
+        {showAnonymityModal && (
+          <div className="anonymity-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="anonymity-modal-title">
+            <div className="anonymity-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="anonymity-modal-header">
+                <div className="anonymity-badge-icon">
+                  <ShieldCheck size={24} />
+                </div>
+                <div className="anonymity-header-text">
+                  <span className="anonymity-college-tag">Maharaja Institute of Technology Mysore</span>
+                  <h3 id="anonymity-modal-title" className="anonymity-modal-title">Anonymity &amp; Privacy Guarantee</h3>
+                </div>
+              </div>
+
+              <div className="anonymity-modal-body">
+                <p className="anonymity-intro-p">
+                  Welcome to <strong>MITM ABHIPRAYA</strong>. Before you begin your course evaluation, please review how your identity and ratings are protected:
+                </p>
+
+                <div className="anonymity-pillar">
+                  <div className="anonymity-pillar-icon">
+                    <Lock size={16} />
+                  </div>
+                  <div className="anonymity-pillar-content">
+                    <h4>100% Cryptographic Anonymity</h4>
+                    <p>Your USN is verified solely to confirm your registration and record completion. It is strictly decoupled and never saved with your feedback ratings.</p>
+                  </div>
+                </div>
+
+                <div className="anonymity-pillar">
+                  <div className="anonymity-pillar-icon">
+                    <EyeOff size={16} />
+                  </div>
+                  <div className="anonymity-pillar-content">
+                    <h4>Zero Faculty Visibility</h4>
+                    <p>Professors and department heads receive only consolidated class averages, radar charts, and anonymous remarks. Individual responses cannot be traced.</p>
+                  </div>
+                </div>
+
+                <div className="anonymity-pillar">
+                  <div className="anonymity-pillar-icon">
+                    <UserCheck size={16} />
+                  </div>
+                  <div className="anonymity-pillar-content">
+                    <h4>Authentic Academic Impact</h4>
+                    <p>Your honest evaluation guides teaching quality, curriculum delivery, and institutional accreditation. Please evaluate each question thoughtfully.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="anonymity-modal-footer">
+                <button
+                  type="button"
+                  className="anonymity-btn-proceed"
+                  onClick={handleAcknowledgeAnonymity}
+                  autoFocus
+                >
+                  <span>I Understand &amp; Begin Evaluation</span>
+                  <ChevronRight size={17} />
+                </button>
+                <p className="anonymity-footer-note">
+                  <Lock size={11} /> End-to-end encrypted session • NBA &amp; NAAC compliant appraisal
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* INSTITUTIONAL HEADER BAR */}
         <header className="eval-header-bar">
           <div className="eval-header-inner">
