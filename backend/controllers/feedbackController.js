@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
+const cacheService = require('../services/cacheService');
 const crypto = require('crypto');
 
 //=========================================================
@@ -307,10 +308,23 @@ const submitFeedback = async (req, res) => {
 const getQuestions = async (req, res) => {
   let { dept_id } = req.params;
   if (dept_id) dept_id = dept_id.toUpperCase();
+  const cacheKey = `questions:dept:${dept_id || 'ALL'}`;
+
+  // 1. Check in-memory cache
+  const cached = cacheService.get(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache-Status', 'HIT');
+    return res.json(cached);
+  }
+
   try {
     const rows = await db('global_feedback_questions')
       .whereRaw('UPPER(dept_id) = ?', [dept_id])
       .orderBy(['question_heading', 'question_id']);
+    
+    // Store in RAM for 15 minutes (900 seconds)
+    cacheService.set(cacheKey, rows, 900);
+    res.setHeader('X-Cache-Status', 'MISS');
     res.json(rows);
   } catch (err) {
     console.error("Error fetching questions:", err);
@@ -320,6 +334,15 @@ const getQuestions = async (req, res) => {
 
 const getStudentQuestions = async (req, res) => {
   const { session_id } = req.params;
+  const cacheKey = `questions:session:${session_id}`;
+
+  // 1. Check in-memory cache
+  const cached = cacheService.get(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache-Status', 'HIT');
+    return res.json(cached);
+  }
+
   try {
     const session = await db('global_sessions').where({ session_id }).first();
     if (!session) return res.status(404).json({ error: "Session not found" });
@@ -327,6 +350,10 @@ const getStudentQuestions = async (req, res) => {
     const rows = await db('global_feedback_questions')
       .whereRaw('UPPER(dept_id) = ?', [session.dept_id.toUpperCase()])
       .orderBy(['question_heading', 'question_id']);
+
+    // Store in RAM for 10 minutes (600 seconds)
+    cacheService.set(cacheKey, rows, 600);
+    res.setHeader('X-Cache-Status', 'MISS');
     res.json(rows);
   } catch (err) {
     console.error("Error fetching student questions:", err);
@@ -345,6 +372,8 @@ const addQuestion = async (req, res) => {
     const [id] = await db('global_feedback_questions').insert({
       question_text, question_heading, dept_id
     });
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
     res.json({ message: "Question added successfully", question_id: id });
   } catch (err) {
     console.error("Error adding question:", err);
@@ -382,6 +411,9 @@ const bulkUploadQuestions = async (req, res) => {
       await logActivity(req, dept_id, 'UPLOAD', 'QUESTION', `Bulk uploaded ${insertedCount} feedback questions`);
     }
 
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
+
     res.json({ message: "Bulk upload successful", inserted: insertedCount });
   } catch (err) {
     console.error("Bulk Question Upload Error:", err);
@@ -400,6 +432,8 @@ const updateQuestion = async (req, res) => {
     const q = db('global_feedback_questions').where({ question_id: id });
     if (dept_id) q.andWhere({ dept_id });
     await q.update({ question_text });
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
     res.json({ message: "Question updated successfully" });
   } catch (err) {
     console.error("Error updating question:", err);
@@ -420,6 +454,8 @@ const deleteQuestion = async (req, res) => {
     }
     await feedbackQuery.del();
     await questionQuery.del();
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
     res.json({ message: "Question deleted successfully" });
   } catch (err) {
     console.error("Error deleting question:", err);

@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
 const { sendFeedbackEmail } = require('../utils/emailService');
+const cacheService = require('../services/cacheService');
 
 //=========================================================
 // Create session
@@ -76,6 +77,8 @@ const createSession = async (req, res) => {
     }
 
     await trx.commit();
+    cacheService.delPattern('sessions:*');
+    cacheService.delPattern('questions:session:*');
     res.json({ message: "Session created" });
   } catch (err) {
     await trx.rollback();
@@ -90,6 +93,14 @@ const createSession = async (req, res) => {
 const getSessions = async (req, res) => {
   try {
     const dept_id = req.session.dept_id || req.query.dept || req.query.dept_id;
+    const cacheKey = `sessions:dept:${dept_id || 'ALL'}`;
+
+    // Micro-cache check (30s TTL): prevents pounding TiDB when multiple tabs/coordinators query
+    const cached = cacheService.get(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache-Status', 'HIT');
+      return res.json(cached);
+    }
     
     const query = db('global_sessions as s');
     if (dept_id) {
@@ -130,6 +141,8 @@ const getSessions = async (req, res) => {
       };
     });
 
+    cacheService.set(cacheKey, enriched, 30); // 30 seconds micro-cache
+    res.setHeader('X-Cache-Status', 'MISS');
     res.json(enriched);
   } catch (err) {
     console.error("Error loading sessions:", err);
@@ -156,6 +169,9 @@ const endSession = async (req, res) => {
     if (req.session?.role === 'department') {
       await logActivity(req, dept_id || 'DEPT', 'UPDATE', 'SESSION', `Ended feedback session ${session_id}`);
     }
+
+    cacheService.delPattern('sessions:*');
+    cacheService.delPattern('questions:session:*');
 
     res.json({ message: "Session ended successfully" });
   } catch (err) {
@@ -196,6 +212,8 @@ const deleteSession = async (req, res) => {
     }
 
     await trx.commit();
+    cacheService.delPattern('sessions:*');
+    cacheService.delPattern('questions:session:*');
     res.json({ message: "Session deleted successfully" });
   } catch (err) {
     await trx.rollback();

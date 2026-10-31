@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
+const cacheService = require('../services/cacheService');
 const bcrypt = require('bcrypt');
 const { escapeSqlLike } = require('../utils/sanitizer');
 
@@ -196,6 +197,7 @@ const toggleDepartmentStatus = async (req, res) => {
   const { is_active } = req.body;
   try {
     await db('department').where({ dept_id }).update({ is_active });
+    cacheService.del('departments:active'); // Invalidate department cache
     
     await logActivity(req, 'ADMIN', 'UPDATE', 'DEPARTMENT', `Set department ${dept_id} to ${is_active ? 'Active' : 'Inactive'}`);
 

@@ -1,15 +1,25 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
+const cacheService = require('../services/cacheService');
 const bcrypt = require('bcrypt');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { escapeSqlLike } = require('../utils/sanitizer');
 const { processAndUploadLogo } = require('../utils/imageProcessor');
 
 const getDepartments = async (req, res) => {
+  const cacheKey = 'departments:active';
+  const cached = cacheService.get(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache-Status', 'HIT');
+    return res.json(cached);
+  }
+
   try {
     const rows = await db('department')
       .where({ is_active: true })
       .select('dept_id', 'dept_name', 'is_active', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip');
+    cacheService.set(cacheKey, rows, 1800); // 30 minutes TTL
+    res.setHeader('X-Cache-Status', 'MISS');
     return res.json(rows);
   } catch (err) {
     console.warn("[getDepartments] Connection error on first attempt, retrying with fresh connection...", err.message);
@@ -17,6 +27,8 @@ const getDepartments = async (req, res) => {
       const retryRows = await db('department')
         .where({ is_active: true })
         .select('dept_id', 'dept_name', 'is_active', 'logo_url', 'brand_color', 'brand_accent', 'logo_lqip');
+      cacheService.set(cacheKey, retryRows, 1800);
+      res.setHeader('X-Cache-Status', 'MISS');
       return res.json(retryRows);
     } catch (retryErr) {
       console.error("[getDepartments FATAL]:", retryErr.message);
@@ -64,6 +76,7 @@ const addDepartment = async (req, res) => {
     });
     
     await trx.commit();
+    cacheService.del('departments:active'); // Invalidate department cache
     res.json({ 
       success: true, 
       message: "Department created successfully",
@@ -113,6 +126,8 @@ const updateDepartmentLogo = async (req, res) => {
       req.session.logo_url = processed.logo_url;
       req.session.logo_lqip = processed.logo_lqip;
     }
+
+    cacheService.del('departments:active'); // Invalidate department cache
 
     return res.json({
       success: true,

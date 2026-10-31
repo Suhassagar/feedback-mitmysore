@@ -5,6 +5,7 @@ const mysql = require("mysql2/promise");
 const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
 const cors = require("cors");
+const compression = require("compression");
 const bcrypt = require("bcrypt");
 const helmet = require("helmet");
 const http = require("http");
@@ -81,6 +82,18 @@ app.use(
     optionsSuccessStatus: 200,
   })
 );
+
+// --- HTTP Response Compression (Gzip / Deflate) ---
+// Automatically compresses JSON and text responses > 1KB by 75-85% for fast mobile loading
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 
 // --- JSON & URL-encoded parsing (bounded to prevent DoS memory bloat) ---
 app.use(express.json({ limit: '2mb' }));
@@ -263,6 +276,7 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 app.use(apiLimiter); // Apply general rate limit to all API routes
 
 app.use('/auth', require('./routes/authRoutes'));
+app.use('/vault', require('./routes/vaultRoutes'));
 app.use('/faculty', require('./routes/facultyRoutes'));
 app.use('/', require('./routes/studentRoutes'));
 app.use('/', require('./routes/courseRoutes'));

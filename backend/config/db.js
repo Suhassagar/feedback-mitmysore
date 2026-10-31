@@ -29,10 +29,12 @@ const dbOptions = {
     connectTimeout: 30000,
   },
   pool: { 
-    min: 0, 
-    max: 25,
-    acquireTimeoutMillis: 60000,
-    idleTimeoutMillis: 30000,
+    min: 2, 
+    max: 10,
+    acquireTimeoutMillis: 30000,
+    idleTimeoutMillis: 15000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200,
     afterCreate: (conn, done) => {
       conn.query('SET NAMES utf8mb4;', (err) => {
         done(err, conn);
