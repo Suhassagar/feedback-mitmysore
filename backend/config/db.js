@@ -184,6 +184,17 @@ async function ensurePerformanceIndexes() {
           console.log('✅ Added missing is_genuine column for variance shadowbanning');
         }
       });
+
+      const hasIntegrity = await db.schema.hasColumn('global_student_feedback', 'integrity_status');
+      if (!hasIntegrity) {
+        await db.schema.table('global_student_feedback', t => {
+          t.string('integrity_status', 30).defaultTo('verified');
+          t.integer('submission_attempt').defaultTo(1);
+          t.text('justification_remark').nullable();
+        });
+        console.log('✅ Added integrity_status, submission_attempt, and justification_remark to global_student_feedback');
+      }
+
       // Composite covering indexes for session reports, averages, and trend analytics
       await safeAddIndex('global_student_feedback', 'idx_feedback_session_dept', 'session_id, dept_id');
       await safeAddIndex('global_student_feedback', 'idx_feedback_faculty_course', 'faculty_id, course_id, dept_id');
@@ -191,6 +202,7 @@ async function ensurePerformanceIndexes() {
       await safeAddIndex('global_student_feedback', 'idx_feedback_dept_genuine_rating', 'dept_id, is_genuine, rating');
       await safeAddIndex('global_student_feedback', 'idx_feedback_session_question', 'session_id, is_genuine, question_id, rating');
       await safeAddIndex('global_student_feedback', 'idx_feedback_dept_created', 'dept_id, is_genuine, created_at');
+      await safeAddIndex('global_student_feedback', 'idx_feedback_session_integrity', 'session_id, integrity_status');
     }
 
     const studentsExists = await db.schema.hasTable('global_students');
@@ -210,6 +222,15 @@ async function ensurePerformanceIndexes() {
 
     const scorecardsExists = await db.schema.hasTable('global_faculty_scorecards');
     if (scorecardsExists) {
+      const hasRawScores = await db.schema.hasColumn('global_faculty_scorecards', 'raw_score_sum');
+      if (!hasRawScores) {
+        await db.schema.table('global_faculty_scorecards', t => {
+          t.integer('raw_score_sum').notNullable().defaultTo(0);
+          t.integer('raw_ratings_count').notNullable().defaultTo(0);
+        });
+        console.log('✅ Added raw_score_sum and raw_ratings_count to global_faculty_scorecards');
+      }
+
       // Fast department scorecard summaries
       await safeAddIndex('global_faculty_scorecards', 'idx_scorecards_dept_session', 'dept_id, session_id');
     }

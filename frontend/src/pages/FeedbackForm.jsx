@@ -13,7 +13,8 @@ import {
   MessageSquare,
   Lock,
   EyeOff,
-  UserCheck
+  UserCheck,
+  AlertTriangle
 } from "lucide-react";
 import PageTransition from "../components/PageTransition";
 import { jumbleQuestionsForStudent } from "../utils/shuffleUtils";
@@ -168,6 +169,13 @@ export default function FeedbackForm() {
   });
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dynamic Feedback Authenticity Guard state
+  const [submissionAttempt, setSubmissionAttempt] = useState(1);
+  const [justificationRemark, setJustificationRemark] = useState("");
+  const [showIntegrityModal, setShowIntegrityModal] = useState(false);
+  const [detectedUniformScore, setDetectedUniformScore] = useState(null);
+  const [showJustificationInput, setShowJustificationInput] = useState(false);
 
   // Auto-sync draft to sessionStorage to protect against accidental tab reload or phone lock
   useEffect(() => {
@@ -373,6 +381,7 @@ export default function FeedbackForm() {
     let attempt = 0;
     let success = false;
     let lastError = null;
+    let integrityInterception = false;
 
     while (attempt < maxAttempts && !success) {
       attempt++;
@@ -387,7 +396,9 @@ export default function FeedbackForm() {
             session_id,
             facultyList: feedbackPayload,
             department_remark: departmentRemark,
-            idempotency_key: idempotencyKey
+            idempotency_key: idempotencyKey,
+            submission_attempt: submissionAttempt,
+            justification_remark: justificationRemark,
           },
           { withCredentials: true, timeout: 15000 }
         );
@@ -396,8 +407,30 @@ export default function FeedbackForm() {
         toast.dismiss('retry-toast');
       } catch (err) {
         lastError = err;
+
+        // Dynamic Feedback Authenticity Guard: Intercept HTTP 422
+        if (err.response?.status === 422) {
+          const resp = err.response.data;
+          if (resp?.code === "INTEGRITY_RETRY_REQUIRED") {
+            integrityInterception = true;
+            setDetectedUniformScore(resp.detected_score);
+            setSubmissionAttempt(2);
+            setShowSubmitModal(false);
+            setShowIntegrityModal(true);
+            break;
+          } else if (resp?.code === "JUSTIFICATION_REQUIRED") {
+            integrityInterception = true;
+            setDetectedUniformScore(resp.detected_score);
+            setSubmissionAttempt(2);
+            setShowJustificationInput(true);
+            setShowSubmitModal(false);
+            setShowIntegrityModal(true);
+            break;
+          }
+        }
+
         // If client error (bad request, duplicate token, dwell timer, unauthorized), do not retry
-        if (err.response?.status === 403 || err.response?.status === 400 || err.response?.status === 401) {
+        if (err.response?.status === 403 || err.response?.status === 400 || err.response?.status === 401 || err.response?.status === 422) {
           break;
         }
         // If network disconnect or server 5xx, wait and retry with exponential backoff
@@ -423,8 +456,9 @@ export default function FeedbackForm() {
 
       toast.success("Feedback submitted successfully.");
       setShowSubmitModal(false);
+      setShowIntegrityModal(false);
       navigate("/");
-    } else {
+    } else if (!integrityInterception) {
       toast.dismiss('retry-toast');
       console.error("Submission failed after attempts:", lastError?.response?.data || lastError?.message);
       toast.error(lastError?.response?.data?.error || "Submission failed due to weak network. Your answers are saved as draft! Please check your connection and tap Submit again.", { duration: 6000 });
@@ -851,6 +885,125 @@ export default function FeedbackForm() {
           isDestructive={false}
           isLoading={isSubmitting}
         />
+
+        {/* ============================================================ */}
+        {/* REFLECTION & RE-EVALUATION AUTHENTICITY MODAL                */}
+        {/* ============================================================ */}
+        {showIntegrityModal && (
+          <div className="anonymity-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="integrity-modal-title">
+            <div className="anonymity-modal-card integrity-modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="anonymity-modal-header integrity-modal-header">
+                <div className="integrity-badge-icon">
+                  <AlertTriangle size={24} />
+                </div>
+                <div className="anonymity-header-text">
+                  <span className="integrity-college-tag">NBA &amp; NAAC Institutional Quality Standard</span>
+                  <h3 id="integrity-modal-title" className="anonymity-modal-title">Feedback Authenticity Review</h3>
+                </div>
+              </div>
+
+              <div className="anonymity-modal-body">
+                <div className="integrity-alert-banner">
+                  <div className="integrity-alert-title">
+                    Uniform Rating Detected ({detectedUniformScore}/5 Across All Courses)
+                  </div>
+                  <p className="integrity-alert-desc">
+                    All faculty questions were marked with an identical score of <strong>{detectedUniformScore}/5</strong>. Thoughtful, differentiated evaluation is vital for meaningful faculty growth and educational quality.
+                  </p>
+                </div>
+
+                {!showJustificationInput ? (
+                  <>
+                    <p className="anonymity-intro-p">
+                      Maharaja Institute of Technology Mysore asks that students reflect on each instructor&apos;s distinct teaching style, clarity, responsiveness, and course pacing:
+                    </p>
+
+                    <div className="integrity-action-card">
+                      <div className="integrity-action-title">Option 1: Review &amp; Adjust Ratings (Recommended)</div>
+                      <p className="integrity-action-desc">
+                        Your selections have been preserved on the form. Revisit individual teacher sections to fine-tune scores where instructional delivery differed.
+                      </p>
+                      <button
+                        type="button"
+                        className="eval-btn-primary integrity-review-btn"
+                        onClick={() => {
+                          setShowIntegrityModal(false);
+                          setCurrentStep(0);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                      >
+                        Review &amp; Adjust Ratings
+                      </button>
+                    </div>
+
+                    <div className="integrity-divider">
+                      <span>OR</span>
+                    </div>
+
+                    <div className="integrity-action-card secondary">
+                      <div className="integrity-action-title">Option 2: Confirm Uniform Scores</div>
+                      <p className="integrity-action-desc">
+                        If all instructors genuinely delivered an identical standard of education across every metric, you may confirm by providing a brief explanation.
+                      </p>
+                      <button
+                        type="button"
+                        className="integrity-secondary-btn"
+                        onClick={() => setShowJustificationInput(true)}
+                      >
+                        Proceed to Provide Justification &rarr;
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="integrity-justification-section">
+                    <p className="anonymity-intro-p">
+                      Please provide a brief justification (minimum 10 characters) explaining why this uniform rating accurately reflects your academic experience across all instructors:
+                    </p>
+
+                    <textarea
+                      className="integrity-textarea"
+                      rows={3}
+                      placeholder="e.g., Every instructor showed exceptional commitment and curriculum clarity this semester."
+                      value={justificationRemark}
+                      onChange={(e) => setJustificationRemark(e.target.value)}
+                    />
+
+                    <div className="integrity-char-counter">
+                      <span>{justificationRemark.trim().length} / 10 characters minimum</span>
+                      {justificationRemark.trim().length >= 10 && (
+                        <span className="integrity-valid-text"><Check size={14} /> Requirement met</span>
+                      )}
+                    </div>
+
+                    <div className="integrity-justification-actions">
+                      <button
+                        type="button"
+                        className="integrity-back-btn"
+                        onClick={() => setShowJustificationInput(false)}
+                      >
+                        &larr; Back
+                      </button>
+                      <button
+                        type="button"
+                        className="eval-btn-primary"
+                        disabled={isSubmitting || justificationRemark.trim().length < 10}
+                        onClick={executeSubmit}
+                      >
+                        {isSubmitting ? "Submitting..." : "Confirm & Submit Feedback"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="anonymity-modal-footer">
+                <span className="anonymity-footer-note">
+                  Feedback is strictly anonymous. Your USN is never stored with ratings or remarks.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PageTransition>
   );

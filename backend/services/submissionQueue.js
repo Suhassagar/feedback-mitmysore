@@ -71,8 +71,11 @@ class SubmissionQueue {
     for (const item of items) {
       for (const sc of (item.scorecardUpdatesToInsert || [])) {
         const key = `${sc.dept_id}__${sc.faculty_id}__${sc.course_id}__${sc.session_id}`;
+        const rawSum = sc.rawSum !== undefined ? sc.rawSum : sc.sum;
+        const rawCount = sc.rawCount !== undefined ? sc.rawCount : sc.count;
+
         if (!consolidated.has(key)) {
-          consolidated.set(key, { ...sc });
+          consolidated.set(key, { ...sc, rawSum, rawCount });
         } else {
           const existing = consolidated.get(key);
           existing.sum += sc.sum;
@@ -82,6 +85,8 @@ class SubmissionQueue {
           existing.good += sc.good;
           existing.average += sc.average;
           existing.poor += sc.poor;
+          existing.rawSum += rawSum;
+          existing.rawCount += rawCount;
         }
       }
     }
@@ -126,8 +131,8 @@ class SubmissionQueue {
         for (const score of consolidatedScorecards) {
           await trx.raw(`
             INSERT INTO global_faculty_scorecards (
-              dept_id, faculty_id, course_id, session_id, total_score_sum, ratings_count, genuine_count, excellent_count, good_count, average_count, poor_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              dept_id, faculty_id, course_id, session_id, total_score_sum, ratings_count, genuine_count, excellent_count, good_count, average_count, poor_count, raw_score_sum, raw_ratings_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
               total_score_sum = total_score_sum + VALUES(total_score_sum),
               ratings_count = ratings_count + VALUES(ratings_count),
@@ -135,11 +140,14 @@ class SubmissionQueue {
               excellent_count = excellent_count + VALUES(excellent_count),
               good_count = good_count + VALUES(good_count),
               average_count = average_count + VALUES(average_count),
-              poor_count = poor_count + VALUES(poor_count)
+              poor_count = poor_count + VALUES(poor_count),
+              raw_score_sum = raw_score_sum + VALUES(raw_score_sum),
+              raw_ratings_count = raw_ratings_count + VALUES(raw_ratings_count)
           `, [
             score.dept_id, score.faculty_id, score.course_id, score.session_id, 
             score.sum, score.count, score.genuineCount, score.excellent, 
-            score.good, score.average, score.poor
+            score.good, score.average, score.poor,
+            score.rawSum, score.rawCount
           ]);
         }
 

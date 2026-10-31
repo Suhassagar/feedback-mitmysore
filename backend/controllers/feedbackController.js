@@ -85,6 +85,60 @@ const submitFeedback = async (req, res) => {
   const effectiveSessionId = student_session_id || session_id;
   const verifiedSessionId = effectiveSessionId;
   const student = { usn, session_id: verifiedSessionId, dept_id };
+
+  const submission_attempt = Number(req.body.submission_attempt || 1);
+  const justification_remark = req.body.justification_remark ? String(req.body.justification_remark).trim() : "";
+
+  // 1. IN-MEMORY VALIDATION & AUTHENTICITY ANALYSIS (0 Database operations)
+  const allRatings = [];
+  for (const faculty of facultyList) {
+    if (faculty.feedback) {
+      Object.values(faculty.feedback).forEach(rating => {
+        if (rating != null) allRatings.push(Number(rating));
+      });
+    }
+  }
+
+  if (allRatings.length === 0) {
+    return res.status(400).json({ error: "No feedback ratings provided" });
+  }
+
+  // Statistical Variance Check
+  let isStraightLined = false;
+  const mean = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
+  const variance = allRatings.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allRatings.length;
+  if (variance === 0) {
+    isStraightLined = true;
+  }
+
+  // Step 1a: On Attempt 1, intercept straight-lining with an educational retry requirement
+  if (isStraightLined && submission_attempt === 1) {
+    return res.status(422).json({
+      success: false,
+      code: "INTEGRITY_RETRY_REQUIRED",
+      attempt: 1,
+      detected_score: allRatings[0],
+      message: `Uniform rating of ${allRatings[0]}/5 detected across all faculty questions. Thoughtful, differentiated evaluation is required under institutional quality standards. Please review each teacher's specific delivery and adjust your ratings.`
+    });
+  }
+
+  // Step 1b: On Attempt 2+, if still uniform, require a minimum 10-char justification
+  let integrity_status = 'verified';
+  let isGenuine = true;
+
+  if (isStraightLined) {
+    if (!justification_remark || justification_remark.length < 10) {
+      return res.status(422).json({
+        success: false,
+        code: "JUSTIFICATION_REQUIRED",
+        attempt: submission_attempt,
+        detected_score: allRatings[0],
+        message: "To confirm uniform ratings across all faculty members, please provide a brief justification (at least 10 characters) explaining why this evaluation applies to all subjects."
+      });
+    }
+    integrity_status = 'justified_exception';
+    isGenuine = true;
+  }
   
   // Enforce department-configured minimum dwell time (if > 0)
   const sessionRecord = await db('global_sessions').where({ session_id: effectiveSessionId }).first();
@@ -111,7 +165,8 @@ const submitFeedback = async (req, res) => {
   // =========================================================================
 
   try {
-    // 1. IDEMPOTENCY CHECK: Extremely fast unique index constraint
+
+    // 2. IDEMPOTENCY CHECK: Extremely fast unique index constraint
     try {
       await db('global_used_tokens').insert({ token: idempotency_key });
     } catch (tokenErr) {
@@ -123,7 +178,7 @@ const submitFeedback = async (req, res) => {
 
     const dept_id = student.dept_id;
 
-    // 2. MICRO-SYNCHRONOUS LOCK: Update student status instantly without SELECT FOR UPDATE
+    // 3. MICRO-SYNCHRONOUS LOCK: Update student status instantly without SELECT FOR UPDATE
     const updateResult = await db('global_students')
       .where({ usn: student.usn, dept_id, feedback_given: 'pending' })
       .update({ session_id: verifiedSessionId, feedback_given: 'done' });
@@ -131,25 +186,6 @@ const submitFeedback = async (req, res) => {
     if (updateResult === 0) {
       // Either student not found, or they already submitted
       return res.status(403).json({ error: "Feedback already submitted or student not found" });
-    }
-
-    // 3. IN-MEMORY VALIDATION & STAGING (0 Database operations)
-    const allRatings = [];
-    for (const faculty of facultyList) {
-      if (faculty.feedback) {
-        Object.values(faculty.feedback).forEach(rating => {
-          if (rating != null) allRatings.push(Number(rating));
-        });
-      }
-    }
-    
-    let isGenuine = true;
-    if (allRatings.length > 0) {
-      const mean = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
-      const variance = allRatings.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allRatings.length;
-      if (variance === 0) {
-        isGenuine = false; // Flag as straight-lined (shadowban)
-      }
     }
 
     const ratingsToInsert = [];
@@ -174,6 +210,7 @@ const submitFeedback = async (req, res) => {
       }
 
       let sum = 0;
+      let rawSum = 0;
       let genuineCount = isGenuine ? 1 : 0;
       let excellent = 0, good = 0, average = 0, poor = 0;
 
@@ -185,10 +222,19 @@ const submitFeedback = async (req, res) => {
         }
 
         ratingsToInsert.push({
-          faculty_id: faculty.faculty_id, course_id: faculty.course_id, question_id: qId,
-          rating, session_id, dept_id, is_genuine: isGenuine
+          faculty_id: faculty.faculty_id, 
+          course_id: faculty.course_id, 
+          question_id: qId,
+          rating, 
+          session_id, 
+          dept_id, 
+          is_genuine: isGenuine,
+          integrity_status,
+          submission_attempt,
+          justification_remark: justification_remark || null
         });
 
+        rawSum += rating;
         if (isGenuine) {
           sum += rating;
           if (rating >= 4.5) excellent++;
@@ -199,8 +245,19 @@ const submitFeedback = async (req, res) => {
       }
 
       scorecardUpdatesToInsert.push({
-        dept_id, faculty_id: faculty.faculty_id, course_id: faculty.course_id, session_id,
-        sum, count: questionIds.length, genuineCount, excellent, good, average, poor
+        dept_id, 
+        faculty_id: faculty.faculty_id, 
+        course_id: faculty.course_id, 
+        session_id,
+        sum, 
+        count: questionIds.length, 
+        genuineCount, 
+        excellent, 
+        good, 
+        average, 
+        poor,
+        rawSum,
+        rawCount: questionIds.length
       });
 
       if (faculty.remark && typeof faculty.remark === 'string' && faculty.remark.trim() !== "") {
@@ -236,7 +293,6 @@ const submitFeedback = async (req, res) => {
     }
 
     // 5. ASYNCHRONOUS MICRO-BATCH QUEUE WORKER
-    // Pushes into in-memory queue to consolidate database transactions across 500+ concurrent students
     submissionQueue.enqueue({
       dept_id,
       session_id: verifiedSessionId,
@@ -248,7 +304,7 @@ const submitFeedback = async (req, res) => {
       io: req.app?.get('io')
     });
 
-    await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${verifiedSessionId} (${ratingsToInsert.length} ratings queued)`, 'SUCCESS');
+    await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${verifiedSessionId} (${ratingsToInsert.length} ratings queued, integrity: ${integrity_status})`, 'SUCCESS');
 
   } catch (err) {
     console.error("Error staging feedback:", err);
