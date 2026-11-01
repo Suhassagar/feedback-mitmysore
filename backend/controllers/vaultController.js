@@ -716,9 +716,10 @@ const getStudentList = async (req, res) => {
         's.section',
         's.session_id',
         's.feedback_given',
-        's.created_at'
+        's.email'
       )
-      .orderBy(['s.dept_id', 's.usn'])
+      .orderBy('s.dept_id', 'asc')
+      .orderBy('s.usn', 'asc')
       .limit(limitNum)
       .offset(offset);
 
