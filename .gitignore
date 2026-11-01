@@ -49,3 +49,5 @@ backend/tests/test_socket.js
 private-tools/
 *.vault-console.html
 airgap-vault-console.html
+*.vault.key
+*.key
