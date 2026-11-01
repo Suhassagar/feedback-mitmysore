@@ -70,7 +70,7 @@ const uploadStudents = async (req, res) => {
       const cleanName = String(s.name).trim();
       const cleanSem = parseInt(s.sem, 10);
       const cleanSection = String(s.section || '').trim().toUpperCase();
-      const cleanEmail = s.email ? String(s.email).trim().toLowerCase() : null;
+      const cleanEmail = (s.email && String(s.email).trim()) ? String(s.email).trim().toLowerCase() : null;
 
       // Check if an active session exists for this department, semester, and section
       const activeSession = await trx('global_sessions')
@@ -195,9 +195,157 @@ const bulkDeleteStudents = async (req, res) => {
   }
 };
 
+//=========================================================
+// Update Single Student
+//=========================================================
+const updateStudent = async (req, res) => {
+  const { usn } = req.params;
+  const { name, sem, section, email } = req.body;
+  const targetUsn = req.body.usn ? String(req.body.usn).trim().toUpperCase() : null;
+
+  if (!usn) {
+    return res.status(400).json({ error: "USN parameter is required" });
+  }
+
+  const cleanOldUsn = String(usn).trim().toUpperCase();
+  const cleanNewUsn = targetUsn || cleanOldUsn;
+
+  // Tenant guard: Department coordinators can only update their own students
+  const sessionDept = req.session?.role === 'department' ? req.session.dept_id : null;
+  const rawDept = sessionDept || req.body.dept_id || req.query.dept_id;
+  const cleanDept = rawDept ? String(rawDept).trim().toUpperCase() : null;
+
+  const trx = await db.transaction();
+  try {
+    let studentQuery = trx('global_students').where({ usn: cleanOldUsn });
+    if (cleanDept) studentQuery = studentQuery.andWhere({ dept_id: cleanDept });
+    const existing = await studentQuery.first();
+
+    if (!existing) {
+      await trx.rollback();
+      return res.status(404).json({ error: `Student with USN '${cleanOldUsn}' not found` });
+    }
+
+    const effectiveDeptId = existing.dept_id;
+    const cleanName = name !== undefined ? String(name).trim() : existing.name;
+    const cleanSem = sem !== undefined ? parseInt(sem, 10) : existing.sem;
+    const cleanSection = section !== undefined ? String(section).trim().toUpperCase() : existing.section;
+    const cleanEmail = email !== undefined 
+      ? ((email && String(email).trim()) ? String(email).trim().toLowerCase() : null)
+      : existing.email;
+
+    if (!cleanName) {
+      await trx.rollback();
+      return res.status(400).json({ error: "Student name cannot be empty" });
+    }
+    if (isNaN(cleanSem) || cleanSem < 1 || cleanSem > 8) {
+      await trx.rollback();
+      return res.status(400).json({ error: "Semester must be a valid number between 1 and 8" });
+    }
+    if (!cleanSection || !/^[A-H]$/.test(cleanSection)) {
+      await trx.rollback();
+      return res.status(400).json({ error: "Section must be a single letter between A and H" });
+    }
+
+    // Check if USN is being changed and ensure new USN is not a duplicate
+    const usnChanged = cleanNewUsn !== cleanOldUsn;
+    if (usnChanged) {
+      const duplicateCheck = await trx('global_students')
+        .where({ usn: cleanNewUsn, dept_id: effectiveDeptId })
+        .first();
+      if (duplicateCheck) {
+        await trx.rollback();
+        return res.status(409).json({ error: `Cannot change USN: Student with USN '${cleanNewUsn}' already exists in this department.` });
+      }
+    }
+
+    // Active session rebinding logic:
+    // If sem or section changed, check if an active session exists in the new target sem/section
+    let sessionId = existing.session_id;
+    let feedbackGiven = existing.feedback_given;
+
+    const semOrSecChanged = cleanSem !== existing.sem || cleanSection !== existing.section;
+    if (semOrSecChanged) {
+      // If student hasn't already completed feedback, rebind to active session of new section
+      if (existing.feedback_given !== 'done') {
+        const activeSession = await trx('global_sessions')
+          .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND status = ?', [
+            effectiveDeptId, cleanSem, cleanSection, 'active'
+          ])
+          .first();
+
+        sessionId = activeSession ? activeSession.session_id : null;
+        feedbackGiven = activeSession ? 'missing' : null;
+      }
+    }
+
+    const updatePayload = {
+      name: cleanName,
+      sem: cleanSem,
+      section: cleanSection,
+      email: cleanEmail,
+      session_id: sessionId,
+      feedback_given: feedbackGiven
+    };
+
+    if (usnChanged) {
+      updatePayload.usn = cleanNewUsn;
+    }
+
+    await trx('global_students')
+      .where({ usn: cleanOldUsn, dept_id: effectiveDeptId })
+      .update(updatePayload);
+
+    // If USN changed, sync global_directory
+    if (usnChanged) {
+      await trx('global_directory')
+        .where({ user_id: cleanOldUsn, role: 'student' })
+        .update({ user_id: cleanNewUsn, dept_id: effectiveDeptId });
+    }
+
+    // Write audit log
+    const changes = [];
+    if (usnChanged) changes.push(`USN: ${cleanOldUsn} → ${cleanNewUsn}`);
+    if (cleanName !== existing.name) changes.push(`Name: '${existing.name}' → '${cleanName}'`);
+    if (cleanSem !== existing.sem) changes.push(`Sem: ${existing.sem} → ${cleanSem}`);
+    if (cleanSection !== existing.section) changes.push(`Sec: ${existing.section} → ${cleanSection}`);
+    if (cleanEmail !== existing.email) changes.push(`Email: '${existing.email || "none"}' → '${cleanEmail || "none"}'`);
+
+    const logDesc = changes.length > 0 
+      ? `Updated student ${cleanOldUsn} (${changes.join(', ')})`
+      : `Updated student ${cleanOldUsn}`;
+
+    await logActivity(req, effectiveDeptId, 'UPDATE', 'STUDENT', logDesc);
+
+    await trx.commit();
+
+    const updatedStudent = {
+      usn: cleanNewUsn,
+      dept_id: effectiveDeptId,
+      name: cleanName,
+      sem: cleanSem,
+      section: cleanSection,
+      email: cleanEmail,
+      session_id: sessionId,
+      feedback_given: feedbackGiven
+    };
+
+    res.json({
+      success: true,
+      message: "Student information updated successfully",
+      student: updatedStudent
+    });
+  } catch (err) {
+    await trx.rollback();
+    console.error("Update Student Error:", err);
+    res.status(500).json({ error: "Failed to update student information" });
+  }
+};
+
 module.exports = {
   getStudents,
   uploadStudents,
+  updateStudent,
   deleteStudent,
   bulkDeleteStudents
 };

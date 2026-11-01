@@ -81,7 +81,7 @@ export default function HomePortal() {
           </div>
 
           <div className="home-hero-text">
-            <h1 style={{ letterSpacing: '-0.5px' }}>MITM ABHIPRAYA<br /><span style={{ fontSize: '0.75em', fontWeight: 600, opacity: 0.92, display: 'block', marginTop: '6px' }}>Student Feedback & Course Evaluation Portal</span></h1>
+            <h1 style={{ letterSpacing: '-0.5px' }}>MITM ABHIPRAYA<br /><span style={{ fontSize: '0.75em', fontWeight: 600, opacity: 0.92, display: 'block', marginTop: '6px' }}>Faculty Feedback & Course Evaluation Portal</span></h1>
             <p>Your authentic voice shapes institutional academic excellence.</p>
           </div>
 

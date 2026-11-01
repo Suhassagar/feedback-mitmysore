@@ -1,5 +1,7 @@
 const db = require('../config/db');
 const { logActivity } = require('../utils/logger');
+const cacheService = require('../services/cacheService');
+const submissionQueue = require('../services/submissionQueue');
 const crypto = require('crypto');
 
 //=========================================================
@@ -83,6 +85,60 @@ const submitFeedback = async (req, res) => {
   const effectiveSessionId = student_session_id || session_id;
   const verifiedSessionId = effectiveSessionId;
   const student = { usn, session_id: verifiedSessionId, dept_id };
+
+  const submission_attempt = Number(req.body.submission_attempt || 1);
+  const justification_remark = req.body.justification_remark ? String(req.body.justification_remark).trim() : "";
+
+  // 1. IN-MEMORY VALIDATION & AUTHENTICITY ANALYSIS (0 Database operations)
+  const allRatings = [];
+  for (const faculty of facultyList) {
+    if (faculty.feedback) {
+      Object.values(faculty.feedback).forEach(rating => {
+        if (rating != null) allRatings.push(Number(rating));
+      });
+    }
+  }
+
+  if (allRatings.length === 0) {
+    return res.status(400).json({ error: "No feedback ratings provided" });
+  }
+
+  // Statistical Variance Check
+  let isStraightLined = false;
+  const mean = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
+  const variance = allRatings.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allRatings.length;
+  if (variance === 0) {
+    isStraightLined = true;
+  }
+
+  // Step 1a: On Attempt 1, intercept straight-lining with an educational retry requirement
+  if (isStraightLined && submission_attempt === 1) {
+    return res.status(422).json({
+      success: false,
+      code: "INTEGRITY_RETRY_REQUIRED",
+      attempt: 1,
+      detected_score: allRatings[0],
+      message: `Uniform rating of ${allRatings[0]}/5 detected across all faculty questions. Thoughtful, differentiated evaluation is required under institutional quality standards. Please review each teacher's specific delivery and adjust your ratings.`
+    });
+  }
+
+  // Step 1b: On Attempt 2+, if still uniform, require a minimum 10-char justification
+  let integrity_status = 'verified';
+  let isGenuine = true;
+
+  if (isStraightLined) {
+    if (!justification_remark || justification_remark.length < 10) {
+      return res.status(422).json({
+        success: false,
+        code: "JUSTIFICATION_REQUIRED",
+        attempt: submission_attempt,
+        detected_score: allRatings[0],
+        message: "To confirm uniform ratings across all faculty members, please provide a brief justification (at least 10 characters) explaining why this evaluation applies to all subjects."
+      });
+    }
+    integrity_status = 'justified_exception';
+    isGenuine = true;
+  }
   
   // Enforce department-configured minimum dwell time (if > 0)
   const sessionRecord = await db('global_sessions').where({ session_id: effectiveSessionId }).first();
@@ -109,7 +165,8 @@ const submitFeedback = async (req, res) => {
   // =========================================================================
 
   try {
-    // 1. IDEMPOTENCY CHECK: Extremely fast unique index constraint
+
+    // 2. IDEMPOTENCY CHECK: Extremely fast unique index constraint
     try {
       await db('global_used_tokens').insert({ token: idempotency_key });
     } catch (tokenErr) {
@@ -121,7 +178,7 @@ const submitFeedback = async (req, res) => {
 
     const dept_id = student.dept_id;
 
-    // 2. MICRO-SYNCHRONOUS LOCK: Update student status instantly without SELECT FOR UPDATE
+    // 3. MICRO-SYNCHRONOUS LOCK: Update student status instantly without SELECT FOR UPDATE
     const updateResult = await db('global_students')
       .where({ usn: student.usn, dept_id, feedback_given: 'pending' })
       .update({ session_id: verifiedSessionId, feedback_given: 'done' });
@@ -129,25 +186,6 @@ const submitFeedback = async (req, res) => {
     if (updateResult === 0) {
       // Either student not found, or they already submitted
       return res.status(403).json({ error: "Feedback already submitted or student not found" });
-    }
-
-    // 3. IN-MEMORY VALIDATION & STAGING (0 Database operations)
-    const allRatings = [];
-    for (const faculty of facultyList) {
-      if (faculty.feedback) {
-        Object.values(faculty.feedback).forEach(rating => {
-          if (rating != null) allRatings.push(Number(rating));
-        });
-      }
-    }
-    
-    let isGenuine = true;
-    if (allRatings.length > 0) {
-      const mean = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
-      const variance = allRatings.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allRatings.length;
-      if (variance === 0) {
-        isGenuine = false; // Flag as straight-lined (shadowban)
-      }
     }
 
     const ratingsToInsert = [];
@@ -172,6 +210,7 @@ const submitFeedback = async (req, res) => {
       }
 
       let sum = 0;
+      let rawSum = 0;
       let genuineCount = isGenuine ? 1 : 0;
       let excellent = 0, good = 0, average = 0, poor = 0;
 
@@ -183,10 +222,19 @@ const submitFeedback = async (req, res) => {
         }
 
         ratingsToInsert.push({
-          faculty_id: faculty.faculty_id, course_id: faculty.course_id, question_id: qId,
-          rating, session_id, dept_id, is_genuine: isGenuine
+          faculty_id: faculty.faculty_id, 
+          course_id: faculty.course_id, 
+          question_id: qId,
+          rating, 
+          session_id, 
+          dept_id, 
+          is_genuine: isGenuine,
+          integrity_status,
+          submission_attempt,
+          justification_remark: justification_remark || null
         });
 
+        rawSum += rating;
         if (isGenuine) {
           sum += rating;
           if (rating >= 4.5) excellent++;
@@ -197,8 +245,19 @@ const submitFeedback = async (req, res) => {
       }
 
       scorecardUpdatesToInsert.push({
-        dept_id, faculty_id: faculty.faculty_id, course_id: faculty.course_id, session_id,
-        sum, count: questionIds.length, genuineCount, excellent, good, average, poor
+        dept_id, 
+        faculty_id: faculty.faculty_id, 
+        course_id: faculty.course_id, 
+        session_id,
+        sum, 
+        count: questionIds.length, 
+        genuineCount, 
+        excellent, 
+        good, 
+        average, 
+        poor,
+        rawSum,
+        rawCount: questionIds.length
       });
 
       if (faculty.remark && typeof faculty.remark === 'string' && faculty.remark.trim() !== "") {
@@ -233,67 +292,19 @@ const submitFeedback = async (req, res) => {
       res.json({ message: "Feedback submitted successfully" });
     }
 
-    // 5. ASYNCHRONOUS HEAVY INGESTION QUEUE WORKER
-    setTimeout(async () => {
-      const trx = await db.transaction();
-      try {
-        if (ratingsToInsert.length > 0) await trx.batchInsert('global_student_feedback', ratingsToInsert, 100);
-        if (facultyRemarksToInsert.length > 0) await trx('global_faculty_remarks').insert(facultyRemarksToInsert);
-        if (sectionRemarksToInsert.length > 0) await trx('global_section_remarks').insert(sectionRemarksToInsert);
+    // 5. ASYNCHRONOUS MICRO-BATCH QUEUE WORKER
+    submissionQueue.enqueue({
+      dept_id,
+      session_id: verifiedSessionId,
+      ratingsToInsert,
+      facultyRemarksToInsert,
+      sectionRemarksToInsert,
+      scorecardUpdatesToInsert,
+      department_remark,
+      io: req.app?.get('io')
+    });
 
-        for (const score of scorecardUpdatesToInsert) {
-          await trx.raw(`
-            INSERT INTO global_faculty_scorecards (
-              dept_id, faculty_id, course_id, session_id, total_score_sum, ratings_count, genuine_count, excellent_count, good_count, average_count, poor_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-              total_score_sum = total_score_sum + VALUES(total_score_sum),
-              ratings_count = ratings_count + VALUES(ratings_count),
-              genuine_count = genuine_count + VALUES(genuine_count),
-              excellent_count = excellent_count + VALUES(excellent_count),
-              good_count = good_count + VALUES(good_count),
-              average_count = average_count + VALUES(average_count),
-              poor_count = poor_count + VALUES(poor_count)
-          `, [score.dept_id, score.faculty_id, score.course_id, score.session_id, score.sum, score.count, score.genuineCount, score.excellent, score.good, score.average, score.poor]);
-        }
-
-        if (department_remark && department_remark.trim() !== "") {
-          await trx('global_session_remarks').insert({
-            session_id, remark_text: department_remark.trim(), dept_id
-          });
-        }
-
-        await trx.commit();
-        
-        // Notify realtime dashboards
-        const io = req.app.get('io');
-        if (io) io.emit("NEW_FEEDBACK_RECEIVED", { dept_id, session_id });
-
-        await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${session_id} (${ratingsToInsert.length} ratings processed)`, 'SUCCESS');
-
-        // Phase 6: Vector Embeddings
-        const { generateEmbedding } = require('../utils/embedder');
-        for (const r of facultyRemarksToInsert) {
-          const vector = await generateEmbedding(r.remark_text);
-          if (vector) await db('global_faculty_remarks').where({ session_id: r.session_id, faculty_id: r.faculty_id, course_id: r.course_id, remark_text: r.remark_text }).update({ embedding: JSON.stringify(vector) });
-        }
-        for (const r of sectionRemarksToInsert) {
-          const vector = await generateEmbedding(r.remark_text);
-          if (vector) await db('global_section_remarks').where({ session_id: r.session_id, faculty_id: r.faculty_id, course_id: r.course_id, section_heading: r.section_heading, remark_text: r.remark_text }).update({ embedding: JSON.stringify(vector) });
-        }
-        if (department_remark && department_remark.trim() !== "") {
-          const vector = await generateEmbedding(department_remark);
-          if (vector) await db('global_session_remarks').where({ session_id, dept_id, remark_text: department_remark.trim() }).update({ embedding: JSON.stringify(vector) });
-        }
-
-      } catch (ingestErr) {
-        if (trx && !trx.isCompleted()) await trx.rollback();
-        console.error("Background Ingestion Error:", ingestErr);
-        // Fail-safe: Revert student status so they can try again
-        await db('global_students').where({ usn: student.usn, dept_id, session_id }).update({ session_id: null, feedback_given: 'pending' });
-        await db('global_used_tokens').where({ token: idempotency_key }).del().catch(()=>{});
-      }
-    }, 0);
+    await logActivity(req, dept_id, 'SUBMIT', 'FEEDBACK', `Anonymous feedback submitted for session ${verifiedSessionId} (${ratingsToInsert.length} ratings queued, integrity: ${integrity_status})`, 'SUCCESS');
 
   } catch (err) {
     console.error("Error staging feedback:", err);
@@ -307,10 +318,23 @@ const submitFeedback = async (req, res) => {
 const getQuestions = async (req, res) => {
   let { dept_id } = req.params;
   if (dept_id) dept_id = dept_id.toUpperCase();
+  const cacheKey = `questions:dept:${dept_id || 'ALL'}`;
+
+  // 1. Check in-memory cache
+  const cached = cacheService.get(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache-Status', 'HIT');
+    return res.json(cached);
+  }
+
   try {
     const rows = await db('global_feedback_questions')
       .whereRaw('UPPER(dept_id) = ?', [dept_id])
       .orderBy(['question_heading', 'question_id']);
+    
+    // Store in RAM for 15 minutes (900 seconds)
+    cacheService.set(cacheKey, rows, 900);
+    res.setHeader('X-Cache-Status', 'MISS');
     res.json(rows);
   } catch (err) {
     console.error("Error fetching questions:", err);
@@ -320,6 +344,15 @@ const getQuestions = async (req, res) => {
 
 const getStudentQuestions = async (req, res) => {
   const { session_id } = req.params;
+  const cacheKey = `questions:session:${session_id}`;
+
+  // 1. Check in-memory cache
+  const cached = cacheService.get(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache-Status', 'HIT');
+    return res.json(cached);
+  }
+
   try {
     const session = await db('global_sessions').where({ session_id }).first();
     if (!session) return res.status(404).json({ error: "Session not found" });
@@ -327,6 +360,10 @@ const getStudentQuestions = async (req, res) => {
     const rows = await db('global_feedback_questions')
       .whereRaw('UPPER(dept_id) = ?', [session.dept_id.toUpperCase()])
       .orderBy(['question_heading', 'question_id']);
+
+    // Store in RAM for 10 minutes (600 seconds)
+    cacheService.set(cacheKey, rows, 600);
+    res.setHeader('X-Cache-Status', 'MISS');
     res.json(rows);
   } catch (err) {
     console.error("Error fetching student questions:", err);
@@ -345,6 +382,8 @@ const addQuestion = async (req, res) => {
     const [id] = await db('global_feedback_questions').insert({
       question_text, question_heading, dept_id
     });
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
     res.json({ message: "Question added successfully", question_id: id });
   } catch (err) {
     console.error("Error adding question:", err);
@@ -382,6 +421,9 @@ const bulkUploadQuestions = async (req, res) => {
       await logActivity(req, dept_id, 'UPLOAD', 'QUESTION', `Bulk uploaded ${insertedCount} feedback questions`);
     }
 
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
+
     res.json({ message: "Bulk upload successful", inserted: insertedCount });
   } catch (err) {
     console.error("Bulk Question Upload Error:", err);
@@ -400,6 +442,8 @@ const updateQuestion = async (req, res) => {
     const q = db('global_feedback_questions').where({ question_id: id });
     if (dept_id) q.andWhere({ dept_id });
     await q.update({ question_text });
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
     res.json({ message: "Question updated successfully" });
   } catch (err) {
     console.error("Error updating question:", err);
@@ -420,6 +464,8 @@ const deleteQuestion = async (req, res) => {
     }
     await feedbackQuery.del();
     await questionQuery.del();
+    // Invalidate questions cache across all departments & active sessions
+    cacheService.delPattern('questions:*');
     res.json({ message: "Question deleted successfully" });
   } catch (err) {
     console.error("Error deleting question:", err);

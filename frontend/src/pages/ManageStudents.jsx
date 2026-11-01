@@ -5,9 +5,10 @@ import { toast } from "react-hot-toast";
 import PageTransition from "../components/PageTransition";
 import { 
   ArrowLeft, Upload, Trash2, Plus, Search, Mail, 
-  Users, Filter, GraduationCap, X 
+  Users, Filter, GraduationCap, X, Edit2
 } from "lucide-react";
 import BulkUploadModal from "../components/BulkUploadModal";
+import EditStudentModal from "../components/EditStudentModal";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDepartmentName } from "../hooks/useDepartmentName";
 import ConfirmModal from "../components/ui/ConfirmModal";
@@ -32,6 +33,9 @@ function ManageStudents() {
   // Destructive Action Modal State (UIUX-008)
   const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'single', usn, name } | { type: 'bulk', count }
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Edit Student Modal State
+  const [editingStudent, setEditingStudent] = useState(null);
 
   // Navigation & filtering states
   const [selectedSem, setSelectedSem] = useState(null);
@@ -84,7 +88,7 @@ function ManageStudents() {
         students: [{
           usn: newStudentUsn.trim().toUpperCase(),
           name: newStudentName.trim(),
-          email: newStudentEmail ? newStudentEmail.trim().toLowerCase() : null,
+          email: (newStudentEmail && newStudentEmail.trim()) ? newStudentEmail.trim().toLowerCase() : null,
           sem: parseInt(selectedSem, 10),
           section: newStudentSection.trim().toUpperCase(),
           dept_id
@@ -608,7 +612,7 @@ function ManageStudents() {
                     type="email" 
                     className="form-input" 
                     style={{ padding: "8px 12px", fontSize: "13px" }} 
-                    placeholder="student@example.com" 
+                    placeholder="student@example.com (optional)" 
                     value={newStudentEmail} 
                     onChange={(e) => setNewStudentEmail(e.target.value)} 
                   />
@@ -820,15 +824,37 @@ function ManageStudents() {
                                 )}
                               </td>
                               <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                                <button 
-                                  className="btn btn-delete" 
-                                  style={{ padding: "6px", height: "30px", width: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }} 
-                                  onClick={() => setDeleteTarget({ type: 'single', usn: s.usn, name: s.name })} 
-                                  title="Delete Student"
-                                  aria-label={`Delete student ${s.name}`}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                  <button 
+                                    className="btn" 
+                                    style={{ 
+                                      padding: "6px", 
+                                      height: "30px", 
+                                      width: "30px", 
+                                      display: "inline-flex", 
+                                      alignItems: "center", 
+                                      justifyContent: "center", 
+                                      borderRadius: "6px",
+                                      border: "1px solid var(--border-color)",
+                                      background: "#FFFFFF",
+                                      color: "var(--primary)"
+                                    }} 
+                                    onClick={() => setEditingStudent(s)} 
+                                    title="Edit Student Info"
+                                    aria-label={`Edit student ${s.name}`}
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
+                                  <button 
+                                    className="btn btn-delete" 
+                                    style={{ padding: "6px", height: "30px", width: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }} 
+                                    onClick={() => setDeleteTarget({ type: 'single', usn: s.usn, name: s.name })} 
+                                    title="Delete Student"
+                                    aria-label={`Delete student ${s.name}`}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -897,19 +923,44 @@ function ManageStudents() {
                             </div>
                           </div>
 
-                          {/* Right: Delete Action */}
-                          <button 
-                            className="btn btn-delete delete-action-btn"
-                            style={{ padding: "6px", height: "32px", width: "32px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", flexShrink: 0 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget({ type: 'single', usn: s.usn, name: s.name });
-                            }}
-                            title="Delete Student"
-                            aria-label={`Delete student ${s.name}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {/* Right: Actions */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                            <button 
+                              className="btn edit-action-btn"
+                              style={{ 
+                                padding: "6px", 
+                                height: "32px", 
+                                width: "32px", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                justifyContent: "center", 
+                                borderRadius: "6px",
+                                border: "1px solid var(--border-color)",
+                                background: "#FFFFFF",
+                                color: "var(--primary)"
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingStudent(s);
+                              }}
+                              title="Edit Student Info"
+                              aria-label={`Edit student ${s.name}`}
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button 
+                              className="btn btn-delete delete-action-btn"
+                              style={{ padding: "6px", height: "32px", width: "32px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget({ type: 'single', usn: s.usn, name: s.name });
+                              }}
+                              title="Delete Student"
+                              aria-label={`Delete student ${s.name}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -949,6 +1000,24 @@ function ManageStudents() {
             fetchStudents();
             if (loadAnalytics) loadAnalytics();
           }} 
+        />
+      )}
+
+      {editingStudent && (
+        <EditStudentModal
+          isOpen={Boolean(editingStudent)}
+          student={editingStudent}
+          dept_id={dept_id}
+          onClose={() => setEditingStudent(null)}
+          onUpdated={(updated) => {
+            setStudents(prev => prev.map(s => {
+              if (s.usn === editingStudent.usn || s.usn === updated.usn) {
+                return { ...s, ...updated };
+              }
+              return s;
+            }));
+            if (loadAnalytics) loadAnalytics();
+          }}
         />
       )}
     </PageTransition>

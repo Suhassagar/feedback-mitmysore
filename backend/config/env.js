@@ -31,6 +31,10 @@ const envSchema = z.object({
   // Email notifications
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
+
+  // Air-Gapped Master Vault secrets
+  VAULT_GATE_SECRET: z.string().optional().default("Mitm@AirGap@Stealth@2026"),
+  MASTER_VAULT_KEY: z.string().optional().default("Mitm@Vault2026!BreakGlass"),
 }).superRefine((data, ctx) => {
   if (data.NODE_ENV === "production") {
     if (!data.DB_PASSWORD) {

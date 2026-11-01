@@ -5,6 +5,7 @@ const mysql = require("mysql2/promise");
 const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
 const cors = require("cors");
+const compression = require("compression");
 const bcrypt = require("bcrypt");
 const helmet = require("helmet");
 const http = require("http");
@@ -59,6 +60,7 @@ const allowedOrigins = [
 
 const isOriginAllowed = (origin) => {
   if (!origin) return true; // Server-to-server or non-browser tools (e.g. curl/uptime monitors)
+  if (origin === 'null') return true; // Standalone file:// local HTML client (USB pen-drive console)
   if (allowedOrigins.includes(origin)) return true;
   // Permit arbitrary localhost ports strictly in development/test
   if (!isProduction && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
@@ -81,6 +83,18 @@ app.use(
     optionsSuccessStatus: 200,
   })
 );
+
+// --- HTTP Response Compression (Gzip / Deflate) ---
+// Automatically compresses JSON and text responses > 1KB by 75-85% for fast mobile loading
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 
 // --- JSON & URL-encoded parsing (bounded to prevent DoS memory bloat) ---
 app.use(express.json({ limit: '2mb' }));
@@ -160,6 +174,11 @@ const sessionStore = new MySQLStore({
     }
   }
 }, sessionPool);
+
+// Prevent unhandled EventEmitter crashes during transient DB dropouts
+sessionStore.on('error', (error) => {
+  console.error('❌ [SessionStore Error]:', error.message);
+});
 
 const sessionMiddleware = session({
   key: 'connect.sid',
@@ -263,6 +282,7 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 app.use(apiLimiter); // Apply general rate limit to all API routes
 
 app.use('/auth', require('./routes/authRoutes'));
+app.use('/vault', require('./routes/vaultRoutes'));
 app.use('/faculty', require('./routes/facultyRoutes'));
 app.use('/', require('./routes/studentRoutes'));
 app.use('/', require('./routes/courseRoutes'));
@@ -293,7 +313,12 @@ if (require.main === module) {
 
       setInterval(() => {
         httpLib.get(`${targetUrl}/ping`, (res) => {
-          console.log(`[Keep-Alive] Self-ping to ${targetUrl}/ping succeeded (status: ${res.statusCode})`);
+          res.resume(); // Consume and discard data stream to free socket memory
+          if (res.statusCode === 200) {
+            console.log(`[Keep-Alive] Self-ping to ${targetUrl}/ping succeeded (status: 200)`);
+          } else {
+            console.warn(`[Keep-Alive] Self-ping warning: non-200 status (${res.statusCode})`);
+          }
         }).on("error", (err) => {
           console.warn(`[Keep-Alive] Self-ping warning: ${err.message}`);
         });
@@ -306,12 +331,25 @@ if (require.main === module) {
 
 // --- Process Lifecycle & Graceful Shutdown ---
 const db = require("./config/db");
+const submissionQueue = require("./services/submissionQueue");
 
 const gracefulShutdown = (signal) => {
   console.log(`[SYSTEM] Received ${signal}. Initiating graceful shutdown...`);
   server.close(async () => {
     console.log('[SYSTEM] HTTP and WebSocket listeners closed.');
     try {
+      // 1. Drain any in-memory queued submissions to TiDB before cutting connection pools
+      if (submissionQueue && submissionQueue.getQueueLength() > 0) {
+        console.log(`[SYSTEM] Draining ${submissionQueue.getQueueLength()} pending submissions to database...`);
+        const drained = await submissionQueue.drain(6000);
+        console.log(`[SYSTEM] Successfully drained ${drained} queued submissions.`);
+      }
+      if (submissionQueue) {
+        submissionQueue.stop();
+        console.log('[SYSTEM] Submission queue timer stopped.');
+      }
+
+      // 2. Only after queue is drained, safely close database connection pools
       if (sessionPool && typeof sessionPool.end === 'function') {
         await sessionPool.end();
         console.log('[SYSTEM] Session database connection pool drained.');
@@ -334,8 +372,11 @@ const gracefulShutdown = (signal) => {
   }, 10000).unref();
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
 
 process.on('unhandledRejection', (reason) => {
   console.error('[CRITICAL] Unhandled Promise Rejection:', reason);

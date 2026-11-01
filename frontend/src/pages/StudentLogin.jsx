@@ -3,17 +3,21 @@ import apiClient from "../services/apiClient";
 import { useNavigate } from "react-router-dom";
 import PageTransition from "../components/PageTransition";
 import { ArrowLeft } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export default function StudentLogin() {
   const [usn, setUsn] = useState("");
   const [session_id, setSessionId] = useState("");
   const [error, setError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const navigate = useNavigate();
+  const { checkSession } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoggingIn(true);
 
     const cleanUsn = usn.trim().toUpperCase();
     const cleanSessionId = session_id.trim();
@@ -25,15 +29,26 @@ export default function StudentLogin() {
         { withCredentials: true }
       );
 
-      sessionStorage.removeItem('feedback_student_seed');
-      sessionStorage.setItem('student_usn', cleanUsn);
-      navigate("/feedback", { state: { session_id: cleanSessionId, usn: cleanUsn } });
+      if (res.data.success) {
+        await checkSession();
+        sessionStorage.removeItem('feedback_student_seed');
+        sessionStorage.removeItem('feedback_anonymity_acknowledged');
+        sessionStorage.setItem('student_usn', cleanUsn);
+        sessionStorage.setItem('active_feedback_session_id', cleanSessionId);
+        navigate("/feedback", { state: { session_id: cleanSessionId, usn: cleanUsn } });
+      } else {
+        setError(res.data.message || "Invalid credentials");
+      }
     } catch (err) {
-      if (err.response) {
+      if (err.response?.status === 429) {
+        setError(err.response.data?.message || "Too many failed login attempts for this student ID. Please wait 15 minutes before trying again.");
+      } else if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
-        setError("Network error - check server");
+        setError("Network error - unable to connect to server");
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -87,8 +102,8 @@ export default function StudentLogin() {
 
               {error && <p style={{ color: "var(--danger)", margin: "12px 0", fontWeight: "500", fontSize: "14px" }}>{error}</p>}
               
-              <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>
-                Sign In
+              <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={isLoggingIn}>
+                {isLoggingIn ? "Signing In..." : "Sign In"}
               </button>
             </form>
 

@@ -44,3 +44,23 @@ error_log.txt
 scratch/
 scratch_*.js
 backend/tests/test_socket.js
+
+# Air-Gapped / Hardware Pen-Drive Emergency Tools (Never commit to Git)
+private-tools/
+*.vault-console.html
+airgap-vault-console.html
+*.vault.key
+*.key
+
+# AI Agent Framework & Tool Scaffolding (Keep local workspace clean)
+.agent/
+.agents/
+.gemini/
+.gsd/
+adapters/
+scripts/
+GSD-STYLE.md
+PROJECT_RULES.md
+model_capabilities.yaml
+VERSION
+

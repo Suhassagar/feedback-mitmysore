@@ -12,7 +12,7 @@ export const API_BASE_URL =
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
-  timeout: 25000,
+  timeout: 45000, // 45s runway to accommodate Render free-tier cold starts
   headers: {
     'Content-Type': 'application/json',
   },
@@ -27,20 +27,30 @@ apiClient.interceptors.request.use(async (config) => {
   } catch {
     // Ignore error if browser doesn't support it
   }
+
   return config;
 });
 
 // Response Interceptor for global error handling
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const isAuthAttempt = error.config?.url && (
-      error.config.url.includes('/auth/student-login') ||
-      error.config.url.includes('/auth/admin-login') ||
-      error.config.url.includes('/auth/department-login') ||
-      error.config.url.includes('/auth/faculty-login') ||
-      error.config.url.includes('/auth/check-session')
+  async (error) => {
+    const config = error.config;
+    const isAuthAttempt = config?.url && (
+      config.url.includes('/auth/student-login') ||
+      config.url.includes('/auth/admin-login') ||
+      config.url.includes('/auth/department-login') ||
+      config.url.includes('/auth/faculty-login') ||
+      config.url.includes('/auth/check-session')
     );
+
+    // Render Cold-Start Resilience: retry initial non-auth read requests once if server is spinning up
+    if (config && !config._retry && !isAuthAttempt && (error.code === 'ECONNABORTED' || [502, 503, 504].includes(error.response?.status))) {
+      config._retry = true;
+      console.warn("[ApiClient] Server spin-up detected, auto-retrying request in 2.5s...");
+      await new Promise((r) => setTimeout(r, 2500));
+      return apiClient(config);
+    }
 
     if (!isAuthAttempt && error.response) {
       if (error.response.status === 401) {

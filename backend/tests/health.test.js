@@ -1,5 +1,6 @@
 const request = require('supertest');
 const { app, server } = require('../server');
+const emailService = require('../utils/emailService');
 
 describe('Keep-Alive & Health Endpoints', () => {
   afterAll(() => {
@@ -21,8 +22,15 @@ describe('Keep-Alive & Health Endpoints', () => {
   });
 
   it('GET /health/email should verify SMTP configuration and respond with diagnostics', async () => {
+    const spy = vi.spyOn(emailService, 'verifyEmailService').mockResolvedValue({
+      success: true,
+      configured: true,
+      message: 'SMTP handshake verified'
+    });
     const res = await request(app).get('/health/email');
+    expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('configured');
     expect(res.body).toHaveProperty('timestamp');
+    spy.mockRestore();
   });
 });
