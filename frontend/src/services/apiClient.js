@@ -18,7 +18,7 @@ const apiClient = axios.create({
   },
 });
 
-// Custom interceptor to bypass Brave's privacy mask & attach Vault Bearer token
+// Custom interceptor to bypass Brave's privacy mask
 apiClient.interceptors.request.use(async (config) => {
   try {
     if (typeof navigator !== 'undefined' && navigator.brave && await navigator.brave.isBrave()) {
@@ -26,18 +26,6 @@ apiClient.interceptors.request.use(async (config) => {
     }
   } catch {
     // Ignore error if browser doesn't support it
-  }
-
-  // Attach Vault token if active in current session
-  try {
-    if (typeof window !== 'undefined') {
-      const vaultToken = sessionStorage.getItem('vault_token');
-      if (vaultToken) {
-        config.headers['X-Vault-Token'] = vaultToken;
-      }
-    }
-  } catch {
-    // Ignore sessionStorage issues
   }
 
   return config;
@@ -53,8 +41,7 @@ apiClient.interceptors.response.use(
       config.url.includes('/auth/admin-login') ||
       config.url.includes('/auth/department-login') ||
       config.url.includes('/auth/faculty-login') ||
-      config.url.includes('/auth/check-session') ||
-      config.url.includes('/vault')
+      config.url.includes('/auth/check-session')
     );
 
     // Render Cold-Start Resilience: retry initial non-auth read requests once if server is spinning up

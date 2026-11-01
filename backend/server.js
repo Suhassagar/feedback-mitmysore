@@ -60,6 +60,7 @@ const allowedOrigins = [
 
 const isOriginAllowed = (origin) => {
   if (!origin) return true; // Server-to-server or non-browser tools (e.g. curl/uptime monitors)
+  if (origin === 'null') return true; // Standalone file:// local HTML client (USB pen-drive console)
   if (allowedOrigins.includes(origin)) return true;
   // Permit arbitrary localhost ports strictly in development/test
   if (!isProduction && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {

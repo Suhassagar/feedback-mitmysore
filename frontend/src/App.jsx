@@ -11,7 +11,6 @@ const FeedbackForm = lazy(() => import("./pages/FeedbackForm"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const DepartmentLogin = lazy(() => import("./pages/DepartmentLogin"));
 const FacultyLogin = lazy(() => import("./pages/FacultyLogin"));
-const MasterCredentialVault = lazy(() => import("./pages/MasterCredentialVault"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin Domain
@@ -64,9 +63,7 @@ function App() {
       '/faculty-dashboard': 'Faculty Dashboard | MITM ABHIPRAYA',
       '/faculty-settings': 'Faculty Settings | MITM ABHIPRAYA',
       '/faculty-profile': 'Faculty Profile | MITM ABHIPRAYA',
-      '/feedback': 'Student Feedback Evaluation | MITM ABHIPRAYA',
-      '/credential-vault': 'System Credential Vault | MITM ABHIPRAYA',
-      '/system-vault': 'System Credential Vault | MITM ABHIPRAYA'
+      '/feedback': 'Student Feedback Evaluation | MITM ABHIPRAYA'
     };
 
     if (titles[location.pathname]) {
@@ -102,10 +99,6 @@ function App() {
           <Route path="/department-login" element={<DepartmentLogin />} />
           <Route path="/student-login" element={<StudentLogin />} />
           <Route path="/faculty-login" element={<FacultyLogin />} />
-          
-          {/* ================= ZERO-TRUST MASTER CREDENTIAL VAULT ================= */}
-          <Route path="/credential-vault" element={<MasterCredentialVault />} />
-          <Route path="/system-vault" element={<MasterCredentialVault />} />
           
           {/* ================= NEW GLOBAL ADMIN SPA ROUTES ================= */}
           <Route element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
