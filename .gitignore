@@ -51,3 +51,16 @@ private-tools/
 airgap-vault-console.html
 *.vault.key
 *.key
+
+# AI Agent Framework & Tool Scaffolding (Keep local workspace clean)
+.agent/
+.agents/
+.gemini/
+.gsd/
+adapters/
+scripts/
+GSD-STYLE.md
+PROJECT_RULES.md
+model_capabilities.yaml
+VERSION
+
