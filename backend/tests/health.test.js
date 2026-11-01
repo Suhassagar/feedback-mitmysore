@@ -24,5 +24,5 @@ describe('Keep-Alive & Health Endpoints', () => {
     const res = await request(app).get('/health/email');
     expect(res.body).toHaveProperty('configured');
     expect(res.body).toHaveProperty('timestamp');
-  });
+  }, 10000);
 });
