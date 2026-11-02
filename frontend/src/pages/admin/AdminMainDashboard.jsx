@@ -38,7 +38,7 @@ export default function AdminMainDashboard() {
           apiClient.get("/admin/global-faculties", { withCredentials: true }),
           apiClient.get("/admin/department-summaries", { withCredentials: true })
             .catch(() => apiClient.get("/departments", { withCredentials: true })),
-          apiClient.get("/health")
+          apiClient.get("/api/status").catch(() => apiClient.get("/health").catch(() => null))
         ]);
 
         if (isMounted && resMetrics.status === "fulfilled" && resMetrics.value?.data) {
