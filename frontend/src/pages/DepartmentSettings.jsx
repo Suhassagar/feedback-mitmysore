@@ -192,6 +192,7 @@ function DepartmentSettings() {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Enter current password"
+                    autoComplete="current-password"
                     style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border-color)", fontSize: "14px", outline: "none", background: "#f8fafc" }}
                     required
                   />
@@ -205,6 +206,7 @@ function DepartmentSettings() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
+                      autoComplete="new-password"
                       style={{ width: "100%", padding: "10px 12px", paddingRight: "40px", borderRadius: "8px", border: "1px solid var(--border-color)", fontSize: "14px", outline: "none", background: "#f8fafc" }}
                       required
                       minLength={6}
@@ -222,6 +224,7 @@ function DepartmentSettings() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
+                    autoComplete="new-password"
                     style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border-color)", fontSize: "14px", outline: "none", background: "#f8fafc" }}
                     required
                     minLength={6}
