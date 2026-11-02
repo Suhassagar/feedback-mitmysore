@@ -115,13 +115,18 @@ app.get("/ping", (req, res) => {
   res.status(200).json({ status: "alive", timestamp: new Date().toISOString() });
 });
 
-app.get("/health", (req, res) => {
+const handleServerStatus = (req, res) => {
   res.status(200).json({ 
     status: "ok", 
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString() 
   });
-});
+};
+
+app.get("/health", handleServerStatus);
+app.get("/api/status", handleServerStatus);
+app.get("/system/status", handleServerStatus);
+
 
 app.get("/health/email", emailHealthLimiter, async (req, res) => {
   try {
