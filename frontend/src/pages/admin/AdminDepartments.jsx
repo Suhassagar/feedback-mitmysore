@@ -801,6 +801,7 @@ export default function AdminDepartments() {
                   value={newDeptUsername}
                   onChange={(e) => setNewDeptUsername(e.target.value)}
                   placeholder="e.g. cse_hod"
+                  autoComplete="username"
                   style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #E5E7EB", outline: "none", fontSize: "14px" }}
                 />
               </div>
@@ -813,6 +814,7 @@ export default function AdminDepartments() {
                     value={newDeptPassword}
                     onChange={(e) => setNewDeptPassword(e.target.value)}
                     placeholder="Defaults to 'Dept@123'"
+                    autoComplete="new-password"
                     style={{ width: "100%", padding: "12px", paddingRight: "40px", borderRadius: "8px", border: "1px solid #E5E7EB", outline: "none", fontSize: "14px" }}
                   />
                   <button 

@@ -98,6 +98,7 @@ export default function FacultySettingsModals({
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
+                autoComplete="new-password"
                 style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border-color)", fontSize: "14px", outline: "none" }}
               />
             </div>

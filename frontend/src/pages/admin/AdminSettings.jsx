@@ -212,6 +212,7 @@ export default function AdminSettings() {
                       type={showCurrent ? "text" : "password"}
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
+                      autoComplete="current-password"
                       required
                       style={{ width: "100%", padding: "12px", paddingRight: "40px", borderRadius: "8px", border: "1px solid #E5E7EB", outline: "none", fontSize: "14px", transition: "border 0.2s" }}
                     />
@@ -229,6 +230,7 @@ export default function AdminSettings() {
                       type={showNew ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
                       required
                       style={{ width: "100%", padding: "12px", paddingRight: "40px", borderRadius: "8px", border: "1px solid #E5E7EB", outline: "none", fontSize: "14px", transition: "border 0.2s" }}
                     />
@@ -269,6 +271,7 @@ export default function AdminSettings() {
                       type={showConfirm ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
                       required
                       style={{ 
                         width: "100%", padding: "12px", paddingRight: "40px", borderRadius: "8px", outline: "none", fontSize: "14px", transition: "all 0.2s",
