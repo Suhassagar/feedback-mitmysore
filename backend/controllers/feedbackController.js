@@ -411,10 +411,16 @@ const bulkUploadQuestions = async (req, res) => {
   try {
     let insertedCount = 0;
     for (const q of questions) {
-      const text = typeof q === "string" ? q : (q.question_text || q.text);
+      const text = typeof q === "string" ? q : (q.question_text || q.question || q.text);
       const heading = typeof q === "string" ? "General Feedback" : (q.question_heading || q.heading || "General Feedback");
-      await db('global_feedback_questions').insert({ question_text: text, question_heading: heading, dept_id });
-      insertedCount++;
+      if (text && String(text).trim()) {
+        await db('global_feedback_questions').insert({ 
+          question_text: String(text).trim(), 
+          question_heading: String(heading).trim(), 
+          dept_id 
+        });
+        insertedCount++;
+      }
     }
     
     if (req.session?.role === 'department') {
@@ -427,7 +433,7 @@ const bulkUploadQuestions = async (req, res) => {
     res.json({ message: "Bulk upload successful", inserted: insertedCount });
   } catch (err) {
     console.error("Bulk Question Upload Error:", err);
-    res.status(500).json({ error: "Failed to upload questions" });
+    res.status(500).json({ error: "Failed to upload questions", details: err.message });
   }
 };
 

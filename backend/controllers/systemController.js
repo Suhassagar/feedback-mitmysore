@@ -302,14 +302,17 @@ const bulkUploadStudents = async (req, res) => {
       if (!s.usn || !s.name) continue;
       const cleanUsn = String(s.usn).trim().toUpperCase();
       const cleanName = String(s.name).trim();
-      const cleanSem = parseInt(s.sem, 10);
+      const cleanSem = !isNaN(parseInt(s.sem, 10)) ? parseInt(s.sem, 10) : null;
       const cleanSection = String(s.section || '').trim().toUpperCase();
       const cleanEmail = (s.email && String(s.email).trim()) ? String(s.email).trim().toLowerCase() : null;
 
       // Check if an active session exists for this department, semester, and section
-      const activeSession = await trx('global_sessions')
-        .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND status = ?', [cleanDeptId, cleanSem, cleanSection, 'active'])
-        .first();
+      let activeSession = null;
+      if (cleanSem !== null) {
+        activeSession = await trx('global_sessions')
+          .whereRaw('UPPER(dept_id) = ? AND sem = ? AND UPPER(TRIM(section)) = ? AND status = ?', [cleanDeptId, cleanSem, cleanSection, 'active'])
+          .first();
+      }
 
       const sessionIdToBind = activeSession ? activeSession.session_id : null;
       const initialFeedback = activeSession ? 'missing' : null;
@@ -321,7 +324,7 @@ const bulkUploadStudents = async (req, res) => {
       if (existing) {
         const updateData = {
           name: cleanName,
-          sem: cleanSem,
+          sem: cleanSem !== null ? cleanSem : existing.sem,
           section: cleanSection,
           email: cleanEmail
         };
@@ -363,7 +366,7 @@ const bulkUploadStudents = async (req, res) => {
   } catch (err) {
     await trx.rollback();
     console.error("Bulk upload students error:", err);
-    res.status(500).json({ error: "DB error" });
+    res.status(500).json({ error: "Failed to upload students", details: err.message });
   }
 };
 

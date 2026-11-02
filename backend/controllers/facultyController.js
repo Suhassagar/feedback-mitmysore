@@ -259,30 +259,73 @@ const bulkUploadFaculty = async (req, res) => {
     const defaultPassword = await bcrypt.hash("Fac@2007", 10);
     
     for (const f of faculty) {
-      const email = f.email || `${f.faculty_id}@mit.gmail.com`;
+      if (!f.faculty_id || !f.name) continue;
+      const cleanFacultyId = String(f.faculty_id).trim().toUpperCase();
+      const cleanName = String(f.name).trim();
+      let cleanEmail = (f.email && String(f.email).trim()) 
+        ? String(f.email).trim().toLowerCase() 
+        : `${cleanFacultyId.toLowerCase()}@mit.gmail.com`;
       
+      // Check if email is already taken by another faculty member to avoid ER_DUP_ENTRY
+      const emailConflict = await trx('global_faculty')
+        .where({ email: cleanEmail })
+        .whereNot({ faculty_id: cleanFacultyId })
+        .first();
+
+      if (emailConflict) {
+        // Disambiguate email to guarantee uniqueness
+        cleanEmail = `${cleanFacultyId.toLowerCase()}.${cleanDeptId.toLowerCase()}@mit.gmail.com`;
+        const secondConflict = await trx('global_faculty')
+          .where({ email: cleanEmail })
+          .whereNot({ faculty_id: cleanFacultyId })
+          .first();
+        if (secondConflict) {
+          cleanEmail = `${cleanFacultyId.toLowerCase()}.${cleanDeptId.toLowerCase()}.${Date.now().toString().slice(-4)}@mit.gmail.com`;
+        }
+      }
+
       // Upsert global_faculty
-      const existing = await trx('global_faculty').where({ faculty_id: f.faculty_id }).first();
+      const existing = await trx('global_faculty')
+        .where({ faculty_id: cleanFacultyId, dept_id: cleanDeptId })
+        .first();
+
       if (!existing) {
         await trx('global_faculty').insert({
-          faculty_id: f.faculty_id,
-          dept_id,
-          name: f.name,
-          email,
+          faculty_id: cleanFacultyId,
+          dept_id: cleanDeptId,
+          name: cleanName,
+          email: cleanEmail,
           password: defaultPassword,
-          must_change_password: true
+          must_change_password: true,
+          is_active: 1
         });
+        insertedCount++;
+      } else {
+        // Update existing faculty name & reactivate if needed
+        await trx('global_faculty')
+          .where({ faculty_id: cleanFacultyId, dept_id: cleanDeptId })
+          .update({
+            name: cleanName,
+            is_active: 1
+          });
         insertedCount++;
       }
       
-      // Upsert global_directory
+      // Upsert global_directory with both email and faculty_id
+      const safeDeptId = cleanDeptId.substring(0, 20);
       await trx('global_directory')
-        .insert({ user_id: email, role: 'faculty', dept_id })
-        .onConflict('user_id').ignore();
+        .insert({ user_id: cleanEmail, role: 'faculty', dept_id: safeDeptId })
+        .onConflict('user_id')
+        .merge({ dept_id: safeDeptId, role: 'faculty' });
+
+      await trx('global_directory')
+        .insert({ user_id: cleanFacultyId, role: 'faculty', dept_id: safeDeptId })
+        .onConflict('user_id')
+        .merge({ dept_id: safeDeptId, role: 'faculty' });
     }
 
     if (req.session?.role === 'department') {
-      await logActivity(req, dept_id, 'UPLOAD', 'FACULTY', `Bulk uploaded ${insertedCount} faculty members`);
+      await logActivity(req, cleanDeptId, 'UPLOAD', 'FACULTY', `Bulk uploaded ${insertedCount} faculty members`);
     }
 
     await trx.commit();
@@ -290,7 +333,7 @@ const bulkUploadFaculty = async (req, res) => {
   } catch (err) {
     await trx.rollback();
     console.error("Bulk Faculty Upload Error:", err);
-    res.status(500).json({ error: "Failed to upload faculty" });
+    res.status(500).json({ error: "Failed to upload faculty", details: err.message });
   }
 };
 
