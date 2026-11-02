@@ -19,10 +19,12 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
     ? ["course_code", "course_name", "sem"]
     : type === "questions"
     ? ["heading", "question"]
-    : ["faculty_id", "name", "email"];
+    : ["faculty_id", "name"]; // email is optional
 
   const previewColumns = type === "students"
     ? ["usn", "name", "section", "email"]
+    : type === "faculty"
+    ? ["faculty_id", "name", "email"]
     : expectedColumns;
 
   const handleFileUpload = (e) => {
@@ -60,41 +62,52 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
           let newRow = {};
           if (!row || typeof row !== 'object') return newRow;
           Object.keys(row).forEach(key => {
-            const cleanKey = key.trim().toLowerCase();
+            const cleanKey = key.trim().toLowerCase().replace(/[\s\.-]+/g, '_');
             if (DANGEROUS_KEYS.includes(cleanKey)) return;
             if (Object.prototype.hasOwnProperty.call(row, key)) {
               newRow[cleanKey] = typeof row[key] === "string" ? row[key].trim() : row[key];
             }
           });
           
+          if (type === "faculty") {
+            const facId = newRow.faculty_id || newRow.facultyid || newRow.fac_id || newRow.id || newRow.faculty_code || "";
+            const name = newRow.name || newRow.faculty_name || newRow.full_name || "";
+            const email = newRow.email || newRow.email_id || newRow.mail || "";
+            
+            newRow.faculty_id = String(facId).trim().toUpperCase();
+            newRow.name = String(name).trim();
+            newRow.email = email ? String(email).trim().toLowerCase() : "";
+          }
+
           if (type === "students") {
-            if (newRow.usn) newRow.usn = String(newRow.usn).trim().toUpperCase();
-            if (newRow.section) newRow.section = String(newRow.section).trim().toUpperCase();
+            const usn = newRow.usn || newRow.roll_no || newRow.rollno || newRow.student_id || "";
+            const name = newRow.name || newRow.student_name || "";
+            const section = newRow.section || newRow.sec || "";
+            const email = newRow.email || newRow.email_id || "";
+
+            newRow.usn = String(usn).trim().toUpperCase();
+            newRow.name = String(name).trim();
+            newRow.section = String(section).trim().toUpperCase();
             if (newRow.sem) newRow.sem = parseInt(newRow.sem, 10);
             if (selectedSem) newRow.sem = parseInt(selectedSem, 10);
-            newRow.email = (newRow.email && String(newRow.email).trim()) 
-              ? String(newRow.email).trim().toLowerCase() 
-              : null;
+            newRow.email = email ? String(email).trim().toLowerCase() : null;
           }
 
           if (type === "questions") {
-            if (newRow.heading) newRow.heading = String(newRow.heading).trim();
-            if (newRow.question) newRow.question = String(newRow.question).trim();
-            // Dual-compat alias keys so both older and newer backend versions accept the payload
-            newRow.question_text = newRow.question || newRow.question_text || newRow.text;
-            newRow.question_heading = newRow.heading || newRow.question_heading;
+            const heading = newRow.heading || newRow.question_heading || newRow.category || newRow.section || "General Feedback";
+            const question = newRow.question || newRow.question_text || newRow.text || "";
+            newRow.heading = String(heading).trim();
+            newRow.question = String(question).trim();
+            newRow.question_text = newRow.question;
+            newRow.question_heading = newRow.heading;
           }
 
           if (type === "courses") {
-            if (newRow.course_code) newRow.course_code = String(newRow.course_code).trim().toUpperCase();
-            if (newRow.course_name) newRow.course_name = String(newRow.course_name).trim();
-            if (newRow.sem) newRow.sem = parseInt(newRow.sem, 10);
-          }
-
-          if (type === "faculty") {
-            if (newRow.faculty_id) newRow.faculty_id = String(newRow.faculty_id).trim().toUpperCase();
-            if (newRow.name) newRow.name = String(newRow.name).trim();
-            if (newRow.email) newRow.email = String(newRow.email).trim().toLowerCase();
+            const code = newRow.course_code || newRow.coursecode || newRow.code || newRow.subject_code || newRow.sub_code || "";
+            const name = newRow.course_name || newRow.coursename || newRow.name || newRow.title || newRow.subject_name || "";
+            newRow.course_code = String(code).trim().toUpperCase();
+            newRow.course_name = String(name).trim();
+            if (newRow.sem || newRow.semester) newRow.sem = parseInt(newRow.sem || newRow.semester, 10);
           }
 
           return newRow;
@@ -106,7 +119,7 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
           throw new Error("The uploaded file is empty.");
         }
 
-        const missingCols = expectedColumns.filter(col => !Object.keys(normalizedData[0]).includes(col));
+        const missingCols = expectedColumns.filter(col => !Object.keys(normalizedData[0]).includes(col) || !normalizedData[0][col]);
         if (missingCols.length > 0) {
           throw new Error(`Missing required columns: ${missingCols.join(", ")}`);
         }
@@ -257,7 +270,7 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
                   <tr>
                     {previewColumns.map(col => (
                       <th key={col} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)", color: "var(--text-secondary)", fontWeight: "600", textTransform: "uppercase" }}>
-                        {col}{type === "students" && col === "email" ? " (optional)" : ""}
+                        {col}{((type === "students" || type === "faculty") && col === "email") ? " (optional)" : ""}
                       </th>
                     ))}
                   </tr>
@@ -267,7 +280,7 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
                     <tr key={idx} style={{ borderBottom: "1px solid var(--border-color)" }}>
                       {previewColumns.map(col => {
                         const val = row[col];
-                        const isOptional = (type === "students" && col === "email") || (type === "students" && col === "sem");
+                        const isOptional = ((type === "students" || type === "faculty") && col === "email") || (type === "students" && col === "sem");
                         return (
                           <td key={col} style={{ padding: "12px 16px", color: "var(--text-primary)" }}>
                             {val !== undefined && val !== null && val !== "" ? (

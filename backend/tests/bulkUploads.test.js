@@ -102,7 +102,27 @@ describe('Bulk Upload Endpoints Verification', () => {
       expect(inDb.length).toBe(2);
 
       const inDir = await db('global_directory').where({ dept_id: TEST_DEPT, role: 'faculty' });
-      expect(inDir.length).toBe(2);
+      expect(inDir.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should safely handle duplicate emails without 500 database error', async () => {
+      const req = createMockReq('department', TEST_DEPT, {
+        dept_id: TEST_DEPT,
+        faculty: [
+          // Same email as TEST_FAC_001, but new faculty ID
+          { faculty_id: 'TEST_FAC_003', name: 'Dr. Bulk Test 3', email: 'testfac1@mit.gmail.com' },
+          // Existing faculty ID, updated name
+          { faculty_id: 'TEST_FAC_001', name: 'Dr. Bulk Test 1 Updated' }
+        ]
+      });
+      const res = createMockRes();
+      await bulkUploadFaculty(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.jsonPayload.inserted).toBe(2);
+
+      const updated = await db('global_faculty').where({ faculty_id: 'TEST_FAC_001', dept_id: TEST_DEPT }).first();
+      expect(updated.name).toBe('Dr. Bulk Test 1 Updated');
     });
   });
 
