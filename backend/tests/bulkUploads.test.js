@@ -1,5 +1,5 @@
 const { bulkUploadQuestions } = require('../controllers/feedbackController');
-const { bulkUploadFaculty } = require('../controllers/facultyController');
+const { bulkUploadFaculty, updateFaculty, removeFacultyPhotoByAdmin } = require('../controllers/facultyController');
 const { bulkUploadCourses } = require('../controllers/courseController');
 const { bulkUploadStudents } = require('../controllers/systemController');
 const db = require('../config/db');
@@ -123,6 +123,39 @@ describe('Bulk Upload Endpoints Verification', () => {
 
       const updated = await db('global_faculty').where({ faculty_id: 'TEST_FAC_001', dept_id: TEST_DEPT }).first();
       expect(updated.name).toBe('Dr. Bulk Test 1 Updated');
+    });
+
+    it('should update faculty details and profile picture URL via updateFaculty', async () => {
+      const req = {
+        params: { faculty_id: 'TEST_FAC_001' },
+        session: { role: 'department', dept_id: TEST_DEPT },
+        body: {
+          name: 'Dr. Bulk Test 1 Photogenic',
+          email: 'testfac1@mit.gmail.com',
+          position: 'Associate Professor',
+          profile_picture_url: 'https://res.cloudinary.com/test/image/upload/v1/faculty_profiles/fac_001.jpg'
+        }
+      };
+      const res = createMockRes();
+      await updateFaculty(req, res);
+
+      expect(res.statusCode).toBe(200);
+      const inDb = await db('global_faculty').where({ faculty_id: 'TEST_FAC_001', dept_id: TEST_DEPT }).first();
+      expect(inDb.position).toBe('Associate Professor');
+      expect(inDb.profile_picture_url).toBe('https://res.cloudinary.com/test/image/upload/v1/faculty_profiles/fac_001.jpg');
+    });
+
+    it('should remove faculty profile picture via removeFacultyPhotoByAdmin', async () => {
+      const req = {
+        params: { faculty_id: 'TEST_FAC_001' },
+        session: { role: 'department', dept_id: TEST_DEPT }
+      };
+      const res = createMockRes();
+      await removeFacultyPhotoByAdmin(req, res);
+
+      expect(res.statusCode).toBe(200);
+      const inDb = await db('global_faculty').where({ faculty_id: 'TEST_FAC_001', dept_id: TEST_DEPT }).first();
+      expect(inDb.profile_picture_url).toBeNull();
     });
   });
 

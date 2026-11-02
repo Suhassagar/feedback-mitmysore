@@ -184,7 +184,7 @@ const rejectFaculty = async (req, res) => {
 //=========================================================
 const updateFaculty = async (req, res) => {
   const { faculty_id } = req.params;
-  const { name, email, position, dob, joining_date } = req.body;
+  const { name, email, position, dob, joining_date, profile_picture_url } = req.body;
   const dept_id = req.session?.dept_id || req.query.dept_id || req.body?.dept_id;
 
   try {
@@ -192,11 +192,134 @@ const updateFaculty = async (req, res) => {
     const safeJoiningDate = joining_date || null;
     const q = db('global_faculty').where({ faculty_id });
     if (dept_id) q.andWhere({ dept_id });
-    await q.update({ name, email, position, dob: safeDob, joining_date: safeJoiningDate });
+
+    const updatePayload = { name, email, position, dob: safeDob, joining_date: safeJoiningDate };
+    if (profile_picture_url !== undefined) {
+      updatePayload.profile_picture_url = profile_picture_url;
+    }
+    await q.update(updatePayload);
       
     res.json({ success: true, message: "Faculty updated" });
   } catch (err) {
     res.status(500).json({ success: false, message: "Error updating faculty" });
+  }
+};
+
+//=========================================================
+// Upload Faculty Photo (Admin / Department)
+//=========================================================
+const uploadFacultyPhotoByAdmin = async (req, res) => {
+  const { faculty_id } = req.params;
+
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ success: false, message: "No image provided" });
+  }
+
+  // Validate genuine image magic bytes (PNG, JPEG, WEBP, GIF)
+  const fileType = validateMagicBytes(req.file.buffer);
+  if (!fileType) {
+    return res.status(400).json({ success: false, message: "Invalid or disguised image file format. Supported formats: PNG, JPEG, WEBP, GIF." });
+  }
+
+  try {
+    const faculty = await db('global_faculty').where({ faculty_id }).first();
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: "Faculty member not found" });
+    }
+
+    if (req.session?.role === 'department' && req.session.dept_id) {
+      if (faculty.dept_id.toUpperCase() !== req.session.dept_id.toUpperCase()) {
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot edit faculty from another department" });
+      }
+    }
+
+    const safeFacId = String(faculty_id).replace(/[^a-zA-Z0-9_-]/g, '');
+    const publicId = `faculty_${safeFacId}_${Date.now()}`;
+
+    // Upload directly to Cloudinary
+    const uploadResult = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'faculty_profiles',
+          public_id: publicId,
+          transformation: [
+            { width: 800, height: 800, crop: "fill", gravity: "face" }
+          ],
+          tags: [`faculty_${safeFacId}`, 'admin_upload']
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
+    });
+
+    const newUrl = uploadResult.secure_url;
+    const oldUrl = faculty.profile_picture_url;
+
+    // Update database
+    await db('global_faculty')
+      .where({ faculty_id })
+      .update({ profile_picture_url: newUrl });
+
+    // Clean up old image from Cloudinary if different
+    if (oldUrl && oldUrl !== newUrl) {
+      const match = oldUrl.match(/faculty_profiles\/([^/?.]+)/);
+      if (match && process.env.CLOUDINARY_API_KEY) {
+        const oldPublicId = `faculty_profiles/${match[1]}`;
+        cloudinary.uploader.destroy(oldPublicId).catch(e => console.warn("Failed to delete old image:", e.message));
+      }
+    }
+
+    await logActivity(req, faculty.dept_id, 'UPDATE', 'FACULTY', `Updated profile picture for ${faculty.name} (${faculty_id})`);
+
+    res.json({ success: true, url: newUrl, message: "Faculty photo updated successfully" });
+  } catch (err) {
+    console.error("Error uploading faculty photo by admin/department:", err);
+    res.status(500).json({ success: false, message: "Failed to upload photo", details: err.message });
+  }
+};
+
+//=========================================================
+// Remove Faculty Photo (Admin / Department)
+//=========================================================
+const removeFacultyPhotoByAdmin = async (req, res) => {
+  const { faculty_id } = req.params;
+
+  try {
+    const faculty = await db('global_faculty').where({ faculty_id }).first();
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: "Faculty member not found" });
+    }
+
+    if (req.session?.role === 'department' && req.session.dept_id) {
+      if (faculty.dept_id.toUpperCase() !== req.session.dept_id.toUpperCase()) {
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot edit faculty from another department" });
+      }
+    }
+
+    const oldUrl = faculty.profile_picture_url;
+    await db('global_faculty').where({ faculty_id }).update({ profile_picture_url: null });
+
+    if (oldUrl) {
+      try {
+        const match = oldUrl.match(/faculty_profiles\/([^/?.]+)/);
+        if (match && process.env.CLOUDINARY_API_KEY) {
+          const oldPublicId = `faculty_profiles/${match[1]}`;
+          await cloudinary.uploader.destroy(oldPublicId);
+        }
+      } catch (cloudErr) {
+        console.warn("Cloudinary cleanup notice:", cloudErr.message);
+      }
+    }
+
+    await logActivity(req, faculty.dept_id, 'UPDATE', 'FACULTY', `Removed profile picture for ${faculty.name} (${faculty_id})`);
+
+    res.json({ success: true, message: "Profile picture removed" });
+  } catch (err) {
+    console.error("Error removing faculty photo:", err);
+    res.status(500).json({ success: false, message: "Failed to remove photo" });
   }
 };
 
@@ -551,6 +674,8 @@ module.exports = {
   approveFaculty,
   rejectFaculty,
   updateFaculty,
+  uploadFacultyPhotoByAdmin,
+  removeFacultyPhotoByAdmin,
   deleteFaculty,
   bulkUploadFaculty,
   updateOwnProfile,

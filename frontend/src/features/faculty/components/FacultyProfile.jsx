@@ -100,20 +100,26 @@ export default function FacultyProfile({
     }
   };
 
-  const handleUpdateFaculty = async () => {
+  const handleUpdateFaculty = async (updatedData = null) => {
+    const target = updatedData || editFaculty;
+    if (!target) return;
     try {
-      await apiClient.put(`/faculty/${editFaculty.faculty_id}`, {
-        name: editFaculty.name,
-        email: editFaculty.email,
-        position: editFaculty.position,
-        dob: editFaculty.dob
+      await apiClient.put(`/faculty/${encodeURIComponent(target.faculty_id)}`, {
+        name: target.name,
+        email: target.email,
+        position: target.position,
+        dob: target.dob,
+        profile_picture_url: target.profile_picture_url
       }, { withCredentials: true });
       
-      setSelectedFaculty(editFaculty);
+      setSelectedFaculty(target);
       setEditFaculty(null);
-      loadFaculties();
+      if (loadFaculties) loadFaculties();
       toast.success("Faculty updated successfully!");
-    } catch (err) { toast.error("Error updating"); }
+    } catch (err) {
+      console.error("Error updating faculty:", err);
+      toast.error(err.response?.data?.message || "Error updating faculty");
+    }
   };
 
   const fetchDepartmentCourses = async () => {
