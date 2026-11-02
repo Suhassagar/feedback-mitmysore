@@ -77,13 +77,18 @@ const bulkUploadCourses = async (req, res) => {
   try {
     let insertedCount = 0;
     for (const c of courses) {
-      const existing = await trx('global_course').where({ course_code: c.course_code, dept_id }).first();
+      if (!c.course_code || !c.course_name) continue;
+      const cleanCourseCode = String(c.course_code).trim().toUpperCase();
+      const cleanCourseName = String(c.course_name).trim();
+      const cleanSem = !isNaN(parseInt(c.sem, 10)) ? parseInt(c.sem, 10) : null;
+
+      const existing = await trx('global_course').where({ course_code: cleanCourseCode, dept_id: cleanDeptId }).first();
       if (!existing) {
         await trx('global_course').insert({
-          course_code: c.course_code,
-          dept_id,
-          course_name: c.course_name,
-          sem: c.sem,
+          course_code: cleanCourseCode,
+          dept_id: cleanDeptId,
+          course_name: cleanCourseName,
+          sem: cleanSem,
           is_active: true
         });
         insertedCount++;
@@ -99,7 +104,7 @@ const bulkUploadCourses = async (req, res) => {
   } catch (err) {
     await trx.rollback();
     console.error("Bulk Course Upload Error:", err);
-    res.status(500).json({ error: "Failed to upload courses" });
+    res.status(500).json({ error: "Failed to upload courses", details: err.message });
   }
 };
 

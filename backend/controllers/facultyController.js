@@ -259,16 +259,19 @@ const bulkUploadFaculty = async (req, res) => {
     const defaultPassword = await bcrypt.hash("Fac@2007", 10);
     
     for (const f of faculty) {
-      const email = f.email || `${f.faculty_id}@mit.gmail.com`;
+      if (!f.faculty_id || !f.name) continue;
+      const cleanFacultyId = String(f.faculty_id).trim().toUpperCase();
+      const cleanName = String(f.name).trim();
+      const cleanEmail = (f.email && String(f.email).trim()) ? String(f.email).trim().toLowerCase() : `${cleanFacultyId.toLowerCase()}@mit.gmail.com`;
       
       // Upsert global_faculty
-      const existing = await trx('global_faculty').where({ faculty_id: f.faculty_id }).first();
+      const existing = await trx('global_faculty').where({ faculty_id: cleanFacultyId }).first();
       if (!existing) {
         await trx('global_faculty').insert({
-          faculty_id: f.faculty_id,
-          dept_id,
-          name: f.name,
-          email,
+          faculty_id: cleanFacultyId,
+          dept_id: cleanDeptId,
+          name: cleanName,
+          email: cleanEmail,
           password: defaultPassword,
           must_change_password: true
         });
@@ -277,7 +280,7 @@ const bulkUploadFaculty = async (req, res) => {
       
       // Upsert global_directory
       await trx('global_directory')
-        .insert({ user_id: email, role: 'faculty', dept_id })
+        .insert({ user_id: cleanEmail, role: 'faculty', dept_id: cleanDeptId })
         .onConflict('user_id').ignore();
     }
 
@@ -290,7 +293,7 @@ const bulkUploadFaculty = async (req, res) => {
   } catch (err) {
     await trx.rollback();
     console.error("Bulk Faculty Upload Error:", err);
-    res.status(500).json({ error: "Failed to upload faculty" });
+    res.status(500).json({ error: "Failed to upload faculty", details: err.message });
   }
 };
 

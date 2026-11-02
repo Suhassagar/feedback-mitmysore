@@ -76,6 +76,27 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
               ? String(newRow.email).trim().toLowerCase() 
               : null;
           }
+
+          if (type === "questions") {
+            if (newRow.heading) newRow.heading = String(newRow.heading).trim();
+            if (newRow.question) newRow.question = String(newRow.question).trim();
+            // Dual-compat alias keys so both older and newer backend versions accept the payload
+            newRow.question_text = newRow.question || newRow.question_text || newRow.text;
+            newRow.question_heading = newRow.heading || newRow.question_heading;
+          }
+
+          if (type === "courses") {
+            if (newRow.course_code) newRow.course_code = String(newRow.course_code).trim().toUpperCase();
+            if (newRow.course_name) newRow.course_name = String(newRow.course_name).trim();
+            if (newRow.sem) newRow.sem = parseInt(newRow.sem, 10);
+          }
+
+          if (type === "faculty") {
+            if (newRow.faculty_id) newRow.faculty_id = String(newRow.faculty_id).trim().toUpperCase();
+            if (newRow.name) newRow.name = String(newRow.name).trim();
+            if (newRow.email) newRow.email = String(newRow.email).trim().toLowerCase();
+          }
+
           return newRow;
         });
 
@@ -120,7 +141,8 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
     setIsUploading(true);
     
     try {
-      const payload = { dept_id };
+      const effectiveDeptId = dept_id || localStorage.getItem('dept_id') || "";
+      const payload = { dept_id: effectiveDeptId };
       payload[type] = data;
 
       const apiEndpoint = type === "questions" ? `/department/questions/bulk` : `/${type}/bulk`;
@@ -129,7 +151,8 @@ export default function BulkUploadModal({ type, dept_id, selectedSem, onClose, o
       onSuccess();
     } catch (err) {
       console.error("Upload error:", err);
-      toast.error(err.response?.data?.error || "Bulk upload failed.");
+      const serverErr = err.response?.data?.details || err.response?.data?.error || err.message || "Bulk upload failed.";
+      toast.error(serverErr);
     } finally {
       setIsUploading(false);
     }
