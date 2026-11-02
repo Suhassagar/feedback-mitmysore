@@ -33,6 +33,8 @@ const upload = multer({
 });
 
 router.post('/bulk', isAdminOrDepartment, facultyController.bulkUploadFaculty);
+router.post('/:faculty_id/photo', isAdminOrDepartment, profileUploadLimiter, upload.single('image'), facultyController.uploadFacultyPhotoByAdmin);
+router.delete('/:faculty_id/photo', isAdminOrDepartment, facultyController.removeFacultyPhotoByAdmin);
 router.post('/profile/upload-temp', isFaculty, profileUploadLimiter, upload.single('image'), facultyController.uploadTempProfilePicture);
 router.post('/profile/save', isFaculty, facultyController.saveProfilePicture);
 router.post('/profile/cleanup', isFaculty, facultyController.deleteTempProfilePicture);
